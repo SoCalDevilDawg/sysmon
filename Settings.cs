@@ -27,16 +27,18 @@
 using System;
 using System.Diagnostics;
 using System.Drawing;
+using MKAh;
+using Ini = MKAh.Ini;
 
 namespace SystemMonitor
 {
 	public class Settings
 	{
-		public static SharpConfig.Configuration cfg;
+		public static Ini.Config config;
 		public static string datapath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
 															   "MKAh", "SystemMonitor");
 
-		public static void saveConfig(string configfile, SharpConfig.Configuration config)
+		public static void SaveConfig(string configfile, Ini.Config config)
 		{
 			//Console.WriteLine("Saving: " + configfile);
 			System.IO.Directory.CreateDirectory(datapath);
@@ -46,39 +48,25 @@ namespace SystemMonitor
 			config.SaveToFile(targetfile);
 		}
 
-		public static SharpConfig.Configuration loadConfig(string configfile)
+		public static Ini.Config LoadConfig(string filename)
 		{
-			string path = System.IO.Path.Combine(datapath, configfile);
+			string path = System.IO.Path.Combine(datapath, filename);
 			//Log.Trace("Opening: "+path);
-			SharpConfig.Configuration retcfg;
+			Ini.Config retcfg;
 			if (System.IO.File.Exists(path))
-				retcfg = SharpConfig.Configuration.LoadFromFile(path);
+				retcfg = Ini.Config.FromFile(path);
 			else
 			{
-				retcfg = new SharpConfig.Configuration();
+				retcfg = new Ini.Config();
 				System.IO.Directory.CreateDirectory(datapath);
 			}
 
 			return retcfg;
 		}
 
-		public Settings()
-		{
-			Load();
-		}
+		public Settings() => Load();
 
-		bool _dirty = false;
-		public bool Dirty
-		{
-			get
-			{
-				return _dirty;
-			}
-			set
-			{
-				_dirty = value;
-			}
-		}
+		public bool Dirty { get; set; } = false;
 
 		Point _StartLocation = Point.Empty;
 		public Point StartLocation
@@ -87,7 +75,7 @@ namespace SystemMonitor
 			{
 				if (_StartLocation.IsEmpty)
 				{
-					string t = cfg.TryGet("Core")?.TryGet("Start Location")?.StringValue ?? "0,0";
+					string t = config.Get("Core")?.Get("Start Location")?.Value ?? "0,0";
 					string[] values = t.Split(new string[] { "," }, 2, StringSplitOptions.RemoveEmptyEntries);
 					int x = Convert.ToInt32(values[0]), y = Convert.ToInt32(values[1]);
 					_StartLocation = new Point(x, y);
@@ -98,7 +86,7 @@ namespace SystemMonitor
 			{
 				Dirty |= (_StartLocation != value);
 				_StartLocation = value;
-				cfg["Core"].GetSetDefault("Start Location", "0,0").StringValue = (_StartLocation.X + "," + _StartLocation.Y);
+				config["Core"].GetOrSet("Start Location", "0,0", out _).Value = (_StartLocation.X + "," + _StartLocation.Y);
 			}
 		}
 
@@ -108,7 +96,7 @@ namespace SystemMonitor
 			get
 			{
 				if (_SelfPriority == ProcessPriorityClass.RealTime)
-					_SelfPriority = (ProcessPriorityClass)(cfg.TryGet("Core")?.GetSetDefault("Self Priority", (int)ProcessPriorityClass.Idle)?.IntValue ?? 2);
+					_SelfPriority = (ProcessPriorityClass)(config.Get("Core")?.GetOrSet("Self Priority", (int)ProcessPriorityClass.Idle, out _)?.IntValue ?? 2);
 				if (_SelfPriority == ProcessPriorityClass.RealTime)
 					_SelfPriority = ProcessPriorityClass.Idle;
 
@@ -118,7 +106,7 @@ namespace SystemMonitor
 			{
 				Dirty |= (_SelfPriority != value);
 				_SelfPriority = value;
-				cfg["Core"].GetSetDefault("Self Priority", (int)ProcessPriorityClass.Idle).IntValue = (int)_SelfPriority;
+				config["Core"].GetOrSet("Self Priority", (int)ProcessPriorityClass.Idle, out _).IntValue = (int)_SelfPriority;
 			}
 		}
 
@@ -127,26 +115,21 @@ namespace SystemMonitor
 		{
 			get
 			{
-				if (_UpdateFrequency == 0) _UpdateFrequency = cfg["Core"].GetSetDefault("Update Frequency", 2500).IntValue;
+				if (_UpdateFrequency == 0) _UpdateFrequency = config["Core"].GetOrSet("Update Frequency", 2500, out _).IntValue;
 				return _UpdateFrequency;
 			}
 			set
 			{
 				Dirty |= (_UpdateFrequency != value);
 				_UpdateFrequency = value;
-				cfg["Core"].GetSetDefault("Update Frequency", 2500).IntValue = value;
+				config["Core"].GetOrSet("Update Frequency", 2500, out _).IntValue = value;
 			}
 		}
 
-		public void Load()
-		{
-			//MainWindow.AppPath
-			cfg = loadConfig("Core.ini");
-		}
+		const string CoreConfigFile = "Core.ini";
 
-		public void Save()
-		{
-			saveConfig("Core.ini", cfg);
-		}
+		public void Load() => config = LoadConfig(CoreConfigFile);
+
+		public void Save() => SaveConfig(CoreConfigFile, config);
 	}
 }
