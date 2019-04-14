@@ -2,9 +2,9 @@
 // SensorChunk.cs
 //
 // Author:
-//       M.A. (enmoku) <>
+//       M.A. (https://github.com/mkahvi)
 //
-// Copyright (c) 2017 M.A. (enmoku)
+// Copyright (c) 2017 M.A.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -148,7 +148,8 @@ namespace SystemMonitor
 		public SensorValue()
 		{
 			Font = new Font("Verdana", 8f, FontStyle.Regular);
-		}	}
+		}
+	}
 
 	public class SensorChart : IDisposable
 	{
@@ -160,7 +161,7 @@ namespace SystemMonitor
 		public System.Windows.Forms.DataVisualization.Charting.Chart Chart { get; private set; }
 		public System.Windows.Forms.DataVisualization.Charting.Series Series { get; private set; }
 		public System.Windows.Forms.DataVisualization.Charting.ChartArea ChartArea { get; private set; }
-	
+
 		bool Horizontal = false;
 
 		int MaxPoints = 10;

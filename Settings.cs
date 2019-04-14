@@ -2,9 +2,9 @@
 // Settings.cs
 //
 // Author:
-//       M.A. (enmoku) <>
+//       M.A. (https://github.com/mkahvi)
 //
-// Copyright (c) 2017 M.A. (enmoku)
+// Copyright (c) 2017 M.A.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@
 // THE SOFTWARE.
 
 using System;
+using System.Diagnostics;
 using System.Drawing;
 
 namespace SystemMonitor
@@ -33,7 +34,7 @@ namespace SystemMonitor
 	{
 		public static SharpConfig.Configuration cfg;
 		public static string datapath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-		                                                       "Enmoku", "SystemMonitor");
+															   "MKAh", "SystemMonitor");
 
 		public static void saveConfig(string configfile, SharpConfig.Configuration config)
 		{
@@ -58,34 +59,82 @@ namespace SystemMonitor
 				System.IO.Directory.CreateDirectory(datapath);
 			}
 
-			return retcfg;		}
+			return retcfg;
+		}
 
 		public Settings()
 		{
 			Load();
 		}
 
-		bool Dirty = false;
+		bool _dirty = false;
+		public bool Dirty
+		{
+			get
+			{
+				return _dirty;
+			}
+			set
+			{
+				_dirty = value;
+			}
+		}
 
-		Point _startlocation = Point.Empty;
+		Point _StartLocation = Point.Empty;
 		public Point StartLocation
 		{
 			get
 			{
-				if (_startlocation.IsEmpty)
+				if (_StartLocation.IsEmpty)
 				{
 					string t = cfg.TryGet("Core")?.TryGet("Start Location")?.StringValue ?? "0,0";
 					string[] values = t.Split(new string[] { "," }, 2, StringSplitOptions.RemoveEmptyEntries);
 					int x = Convert.ToInt32(values[0]), y = Convert.ToInt32(values[1]);
-					_startlocation = new Point(x, y);
+					_StartLocation = new Point(x, y);
 				}
-				return _startlocation;
+				return _StartLocation;
 			}
 			set
 			{
-				Dirty |= (_startlocation != value);
-				_startlocation = value;
-				cfg["Core"].GetSetDefault("Start Location", "0,0").StringValue = (_startlocation.X + "," + _startlocation.Y);
+				Dirty |= (_StartLocation != value);
+				_StartLocation = value;
+				cfg["Core"].GetSetDefault("Start Location", "0,0").StringValue = (_StartLocation.X + "," + _StartLocation.Y);
+			}
+		}
+
+		ProcessPriorityClass _SelfPriority = ProcessPriorityClass.RealTime;
+		public ProcessPriorityClass SelfPriority
+		{
+			get
+			{
+				if (_SelfPriority == ProcessPriorityClass.RealTime)
+					_SelfPriority = (ProcessPriorityClass)(cfg.TryGet("Core")?.GetSetDefault("Self Priority", (int)ProcessPriorityClass.Idle)?.IntValue ?? 2);
+				if (_SelfPriority == ProcessPriorityClass.RealTime)
+					_SelfPriority = ProcessPriorityClass.Idle;
+
+				return _SelfPriority;
+			}
+			set
+			{
+				Dirty |= (_SelfPriority != value);
+				_SelfPriority = value;
+				cfg["Core"].GetSetDefault("Self Priority", (int)ProcessPriorityClass.Idle).IntValue = (int)_SelfPriority;
+			}
+		}
+
+		private int _UpdateFrequency = 0;
+		public int UpdateFrequency
+		{
+			get
+			{
+				if (_UpdateFrequency == 0) _UpdateFrequency = cfg["Core"].GetSetDefault("Update Frequency", 2500).IntValue;
+				return _UpdateFrequency;
+			}
+			set
+			{
+				Dirty |= (_UpdateFrequency != value);
+				_UpdateFrequency = value;
+				cfg["Core"].GetSetDefault("Update Frequency", 2500).IntValue = value;
 			}
 		}
 

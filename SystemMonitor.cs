@@ -2,9 +2,9 @@
 // MainWindow.cs
 //
 // Author:
-//       M.A. (enmoku) <>
+//       M.A. (https://github.com/mkahvi)
 //
-// Copyright (c) 2017 M.A. (enmoku)
+// Copyright (c) 2017 M.A.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,12 +25,12 @@
 // THE SOFTWARE.
 
 using System;
-using System.Windows.Forms;
-using System.Diagnostics;
 using System.Collections.Generic;
-using System.Management;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System.Management;
+using System.Windows.Forms;
 
 namespace SystemMonitor
 {
@@ -100,7 +100,7 @@ namespace SystemMonitor
 
 		float bottleneck_mem = 0, bottleneck_cpu = 0, bottleneck_nvm = 0;
 		float LowMemThreshold = 4;
-		float LowMemMultiplier = 1.2f;
+		float LowMemMultiplier = 5.2f;
 
 		string[] IgnoreProcesses = { "svchost", "wininit", "System", "Idle" };
 
@@ -193,6 +193,12 @@ namespace SystemMonitor
 			*/
 			var cpuqueuet = cpuqueue.Value;
 			var interruptt = interrupt.Value;
+
+			if (float.IsNaN(cpuusaget) || float.IsNaN(cpuqueuet) || float.IsNaN(interruptt))
+			{
+				// TODO: Handle this
+			}
+
 			//Sensor_CPU.Value.Text = string.Format("{0:N1}%\n{1}\n{2} queued\n{3:N1}% interrupt", cpuusaget, coreusagett, cpuqueuet, interruptt);
 			Sensor_CPU.Value.Text = string.Format("{0:N1}%\n{1} queued\n{2:N1}% interrupt", cpuusaget, cpuqueuet, interruptt);
 			// BOTTLENECK :: CPU
@@ -203,33 +209,56 @@ namespace SystemMonitor
 			// Actual as reported, and memory as determined programmatically. The difference is likely disk caching space.
 			// Memory pressure going over the "true" value is likely going to result in poor performance.
 			float privmem = privatememory.Value;
-			float memfreet = memfree.Value / 1024;
+			float memfreet = memfree.Value / 1024; // free memory in GB
 			float mempressure = (privmem / TotalMemory);
 			float memfreert = (TotalMemory - privmem) / 1024000000;
 			Sensor_Memory.Value.Text = string.Format("{0:N2} GiB free\n{1:N1}% commit\n{2:N1}% pressure",
-			                                         memfreet, memcommit.Value, mempressure*100);
-			var tempmem = (TotalMemoryMB) - (memfreet*1000);
+													 memfreet, memcommit.Value, mempressure * 100);
+			var tempmem = (TotalMemoryMB) - (memfreet * 1000);
 			Sensor_Memory.Chart.Add(tempmem);
 
 			// BOTTLENECK :: MEM
-			bottleneck_mem = (mempressure / 10) + (Math.Max(0, LowMemThreshold - memfreet) * LowMemMultiplier);
-	
+			bottleneck_mem =
+				(mempressure / 10) // memory pressure default by %
+				+ (Math.Max(0, LowMemThreshold - memfreet) * LowMemMultiplier);
+
 			var splitiot = splitio.Value;
 			var highavgt = Math.Max(avgnvmread.Value * 1000, avgnvmwrite.Value * 1000);
 			var nvmqueuet = nvmqueue.Value;
 			var nvmtimet = nvmtime.Value;
-			var nvmbytest = nvmbytes.Value / 1000000;
+			var nvmbytesr = nvmbytes.Value;
+			var nvmbytest = nvmbytesr / 1000000;
 			var nvmtransferst = nvmtransfers.Value;
 			Sensor_NVMIO.Value.Text = string.Format("{0:N2} MB\n{1:N1} transfers\n{2:N1}ms delay\n{3:N2} splits\n{4} queued",
-			                                        nvmbytest, nvmtransferst, highavgt, splitiot, nvmqueuet);
+													nvmbytest, nvmtransferst, highavgt, splitiot, nvmqueuet);
 			Sensor_NVMIO.Chart.Add(nvmbytest);
 
 			// Disk time >20%
 			// Split I/O count >= 2
 
 			// BOTTLENECK :: NVM/HDD/SSD
-			bottleneck_nvm = nvmqueuet.LimitRange(0,8) + (splitiot * 0.3f).LimitRange(0,4) + (highavgt * 0.08f) + (nvmtransferst/500).LimitRange(0,1);
+			bottleneck_nvm = nvmqueuet.LimitRange(0, 8) + (splitiot * 0.3f).LimitRange(0, 4) + (highavgt * 0.08f) + (nvmtransferst / 500).LimitRange(0, 1);
 
+			// PAGE FAULTS
+			var faultcount = pagefault.Value;
+			var pagereadcount = pagereads.Value;
+			if (float.IsNaN(faultcount) || float.IsNaN(pagereadcount))
+			{
+				// TODO: Handle error
+				Sensor_PageFault.Value.Text = "ERROR";
+				Sensor_PageFault.Chart.Add(0);
+			}
+			else
+			{
+				Sensor_PageFault.Value.Text = string.Format("{0:N1} reads/sec\n{1:N2}% hard faults\n{2:N2}% NVM use",
+															pagereadcount, (faultcount <= 0.0001 ? 0 : (pagereadcount / faultcount)), (nvmbytesr <= 0.0001 ? 0 : ((pagereadcount * 4048) / nvmbytesr)));
+				//Console.WriteLine("Page Faults = " + pf);
+				//Console.WriteLine("Page Reads  = " + pr);
+				//Console.WriteLine("Page Fault % = " + (pf / pr));
+				Sensor_PageFault.Chart.Add(faultcount <= 0.0001 ? 0 : (pagereadcount / faultcount));
+			}
+
+			// NETWORK
 			var netint = netin.Value / 1000;
 			var netoutt = netout.Value / 1000;
 			Sensor_NetIO.Value.Text = string.Format("{0:N1} kB In\n{1:N1} kB Out\n{2} queued", netint, netoutt, netqueue.Value);
@@ -264,22 +293,64 @@ namespace SystemMonitor
 		PerformanceCounterWrapper cpuusage;
 		//PerformanceCounterWrapper[] coreusage;
 		PerformanceCounterWrapper cpuqueue;
+		PerformanceCounterWrapper interrupt;
+
 		PerformanceCounterWrapper memfree;
 		PerformanceCounterWrapper memcommit;
 		PerformanceCounterWrapper privatememory;
+
 		PerformanceCounterWrapper nvmbytes;
 		PerformanceCounterWrapper nvmtime;
 		PerformanceCounterWrapper nvmqueue;
+		PerformanceCounterWrapper nvmtransfers;
+		PerformanceCounterWrapper splitio;
+		PerformanceCounterWrapper avgnvmread;
+		PerformanceCounterWrapper avgnvmwrite;
+
 		PerformanceCounterWrapper netin;
 		PerformanceCounterWrapper netout;
 		PerformanceCounterWrapper netqueue;
-		PerformanceCounterWrapper splitio;
-		PerformanceCounterWrapper nvmtransfers;
-		PerformanceCounterWrapper avgnvmread;
-		PerformanceCounterWrapper avgnvmwrite;
-		PerformanceCounterWrapper interrupt;
+
+		PerformanceCounterWrapper pagefault;
+		PerformanceCounterWrapper pagereads;
+		//PerformanceCounterWrapper
+		// DPC : Deferred Procedure Call - delay
+		// ISR : Interrupt Service Routine - delay
+		// Kernel latency
+
 
 		int cores;
+
+		void InitCPUUsageCounters()
+		{
+			var procDict = new Dictionary<string, float>();
+			var counterList = new List<PerformanceCounter>();
+			Process.GetProcesses().ToList().ForEach(p =>
+			{
+				using (p)
+				{
+					if (p.Id <= 4) return;
+					if (counterList.FirstOrDefault(c => c.InstanceName == p.ProcessName) == null)
+					{
+						var counter = new PerformanceCounter("Process", "% Processor Time", p.ProcessName, true);
+						counter.NextValue();
+						counterList.Add(counter);
+					}
+				}
+			});
+			counterList.ForEach(c =>
+			{
+				try
+				{
+					var percent = c.NextValue() / Environment.ProcessorCount;
+					if (Math.Abs(percent) < double.Epsilon)
+						return;
+
+					procDict[c.InstanceName] = percent;
+				}
+				catch (InvalidOperationException) { /* some will fail */ }
+			});
+		}
 
 		void InitCounters()
 		{
@@ -323,6 +394,9 @@ namespace SystemMonitor
 
 			interrupt = new PerformanceCounterWrapper("Processor", "% Interrupt Time", "_Total");
 
+			pagefault = new PerformanceCounterWrapper("Memory", "Page Faults/sec", null);
+			pagereads = new PerformanceCounterWrapper("Memory", "Page Reads/sec", null);
+
 			/*
 			// Unreliable if router is involved.
 			var netband = new PerformanceCounterWrapper("Network Interface", "Current Bandwidth", nic);
@@ -338,6 +412,7 @@ namespace SystemMonitor
 		SensorChunk Sensor_Bottleneck;
 		SensorChunk Sensor_CPU;
 		SensorChunk Sensor_Memory;
+		SensorChunk Sensor_PageFault;
 		SensorChunk Sensor_NVMIO;
 		SensorChunk Sensor_NetIO;
 
@@ -351,19 +426,24 @@ namespace SystemMonitor
 			{
 				base.Dispose(disposing);
 				disposed = true;
-			}		}
+			}
+		}
 
 		MenuItem lowpriocmo;
 		MenuItem normpriocmo;
 		MenuItem highpriocmo;
 		MenuItem togglewarn;
 
+		MenuItem updateFreq05;
+		MenuItem updateFreq15;
+		MenuItem updateFreq25;
+
 		bool FlashWarnings = true;
 
 		bool RunAtStart(bool status, bool dryrun = false)
 		{
 			string runatstart_path = @"Software\Microsoft\Windows\CurrentVersion\Run";
-			string runatstart_key = "Enmoku-SystemMonitor";
+			string runatstart_key = "MKAh-SystemMonitor";
 			string runatstart;
 			Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(runatstart_path, true);
 			if (key != null)
@@ -399,6 +479,7 @@ namespace SystemMonitor
 			SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.OptimizedDoubleBuffer, true);
 			MinimizeBox = false;
 			MaximizeBox = false;
+			// monitors = 6
 			MinimumSize = new Size(650, 136);
 			AutoSizeMode = AutoSizeMode.GrowOnly;
 			AutoSize = true;
@@ -408,7 +489,7 @@ namespace SystemMonitor
 
 			Console.WriteLine("Analyzing system...");
 			try
-            {
+			{
 				using (var memsearch = new ManagementObjectSearcher(@"root\CIMV2", "SELECT TotalPhysicalMemory FROM Win32_ComputerSystem"))
 				{
 					foreach (ManagementObject queryObj in memsearch.Get())
@@ -418,15 +499,20 @@ namespace SystemMonitor
 						break;
 					}
 				}
-            }
-            catch (ManagementException e)
-            {
-                MessageBox.Show("An error occurred while querying for WMI data: " + e.Message);
+			}
+			catch (System.Runtime.InteropServices.COMException e)
+			{
+				MessageBox.Show("A COM error occurred while querying for WMI data: " + e.Message);
 				return;
-            }
+			}
+			catch (ManagementException e)
+			{
+				MessageBox.Show("An error occurred while querying for WMI data: " + e.Message);
+				return;
+			}
 
 			// READ CONFIGURATION
-			
+
 			Console.WriteLine("Configuration start.");
 			var settings = System.Configuration.ConfigurationManager.AppSettings;
 			string freememthresholdkey = "Free memory threshold";
@@ -496,9 +582,12 @@ namespace SystemMonitor
 			Sensor_CPU.Chart.StaticRange = true;
 			tooltip.SetToolTip(Sensor_CPU.Value, "Queued command counter is clearest indicator of underscaled CPU.\nInterrupt percentage shows load from peripherals, NICs, extension cards, and such.");
 
-			Sensor_Memory = new SensorChunk("Memory", true, horizontal:true);
+			Sensor_Memory = new SensorChunk("Memory", true, horizontal: true);
 			tooltip.SetToolTip(Sensor_Memory.Value, "Physical memory usage.\nCommit is swap file usage.\nPressure is private memory load.");
 			Sensor_Memory.Chart.MaxValue = TotalMemoryMB;
+
+			Sensor_PageFault = new SensorChunk("Page Faults", true);
+			tooltip.SetToolTip(Sensor_PageFault.Value, "Page file performance degradation.\nPage faults themselves are not to worry.\nHard page faults can be source of poor performance.");
 
 			Sensor_NVMIO = new SensorChunk("NVM", true);
 			tooltip.SetToolTip(Sensor_NVMIO.Header, "Non-volatile memory: HDD, SSD, etc.\nThese are not clear indicators of bottlenecks if multiple NVMs are involved.");
@@ -510,6 +599,7 @@ namespace SystemMonitor
 			layout.Controls.Add(Sensor_Bottleneck);
 			layout.Controls.Add(Sensor_CPU);
 			layout.Controls.Add(Sensor_Memory);
+			layout.Controls.Add(Sensor_PageFault);
 			layout.Controls.Add(Sensor_NVMIO);
 			layout.Controls.Add(Sensor_NetIO);
 
@@ -532,33 +622,68 @@ namespace SystemMonitor
 					normpriocmo.Checked = false;
 					highpriocmo.Checked = true;
 					lowpriocmo.Checked = false;
+					uSettings.SelfPriority = ProcessPriorityClass.High;
 				}
 				catch { /* NOP */ }
 				Console.WriteLine("~ Self-priority set to High.");
 			});
-			normpriocmo = ContextMenu.MenuItems.Add("Normal priority", (sender, e) => {
+			normpriocmo = ContextMenu.MenuItems.Add("Normal priority", (sender, e) =>
+			{
 				try
 				{
 					Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.Normal;
 					normpriocmo.Checked = true;
 					highpriocmo.Checked = false;
 					lowpriocmo.Checked = false;
+					uSettings.SelfPriority = ProcessPriorityClass.Normal;
 				}
 				catch { /* NOP */ }
 				Console.WriteLine("~ Self-priority set to Normal.");
 			});
-			lowpriocmo = ContextMenu.MenuItems.Add("Low priority", (sender, e) => {
+			lowpriocmo = ContextMenu.MenuItems.Add("Low priority", (sender, e) =>
+			{
 				try
 				{
 					Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.Idle;
 					normpriocmo.Checked = false;
 					highpriocmo.Checked = false;
 					lowpriocmo.Checked = true;
+					uSettings.SelfPriority = ProcessPriorityClass.Idle;
 				}
 				catch { /* NOP */ }
 				Console.WriteLine("~ Self-priority set to Low.");
 			});
+
 			lowpriocmo.Checked = true;
+
+			ContextMenu.MenuItems.Add("-");
+			var n = new System.Windows.Forms.Timer { Interval = 2000 };
+
+			updateFreq05 = ContextMenu.MenuItems.Add("Update 0.5/s", (sender, e) =>
+			{
+				n.Interval = 500;
+				updateFreq05.Checked = true;
+				updateFreq15.Checked = false;
+				updateFreq25.Checked = false;
+				uSettings.UpdateFrequency = n.Interval;
+			});
+			updateFreq15 = ContextMenu.MenuItems.Add("Update 1.5/s", (sender, e) =>
+			{
+				n.Interval = 1500;
+				updateFreq05.Checked = false;
+				updateFreq15.Checked = true;
+				updateFreq25.Checked = false;
+				uSettings.UpdateFrequency = n.Interval;
+			});
+			updateFreq25 = ContextMenu.MenuItems.Add("Update 2.5/s", (sender, e) =>
+			{
+				n.Interval = 2500;
+				updateFreq05.Checked = false;
+				updateFreq15.Checked = false;
+				updateFreq25.Checked = true;
+				uSettings.UpdateFrequency = n.Interval;
+			});
+
 			ContextMenu.MenuItems.Add("-");
 			MenuItem runatstart = ContextMenu.MenuItems.Add("Run at Windows startup");
 			runatstart.Click += (sender, e) =>
@@ -571,7 +696,6 @@ namespace SystemMonitor
 
 			//Console.WriteLine("Total physical memory: {0:N2} GiB", TotalMemoryMB/1000);
 
-			var n = new System.Windows.Forms.Timer { Interval = 2000 };
 			n.Tick += (sender, e) => UpdateSensors();
 
 			UpdateSensors();
@@ -594,13 +718,48 @@ namespace SystemMonitor
 				if (uSettings.StartLocation != Location)
 				{
 					uSettings.StartLocation = Location;
+				}
+
+				if (uSettings.Dirty)
+				{
 					uSettings.Save();
 					Console.WriteLine("Start Location saved: " + uSettings.StartLocation);
+					Console.WriteLine("Self priority saved:  " + uSettings.SelfPriority);
 				}
 			};
 
 			Console.WriteLine("Start location: " + Location);
 			Show();
+
+			Console.WriteLine("Self-priority: " + uSettings.SelfPriority);
+			switch (uSettings.SelfPriority)
+			{
+				case ProcessPriorityClass.High:
+					highpriocmo.PerformClick();
+					break;
+				case ProcessPriorityClass.Normal:
+					normpriocmo.PerformClick();
+					break;
+				case ProcessPriorityClass.Idle:
+				default:
+					lowpriocmo.PerformClick();
+					break;
+			}
+
+			Console.WriteLine("Update Frequency: " + uSettings.UpdateFrequency);
+			switch (uSettings.UpdateFrequency)
+			{
+				case 500:
+					updateFreq05.PerformClick();
+					break;
+				case 1500:
+					updateFreq15.PerformClick();
+					break;
+				default:
+				case 2500:
+					updateFreq25.PerformClick();
+					break;
+			}
 
 			Console.WriteLine("Ready.");
 		}

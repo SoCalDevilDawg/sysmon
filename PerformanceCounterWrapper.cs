@@ -2,9 +2,9 @@
 // PerformanceCounterWrapper.cs
 //
 // Author:
-//       M.A. (enmoku) <>
+//       M.A. (https://github.com/mkahvi)
 //
-// Copyright (c) 2017 M.A. (enmoku)
+// Copyright (c) 2017 M.A.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -36,22 +36,36 @@ namespace SystemMonitor
 
 		public PerformanceCounter Counter { get; private set; }
 
-		public PerformanceCounterWrapper(string category, string counter, string instance = null, bool scrapfirst = true)
+		string p_CategoryName = null;
+		string p_CounterName = null;
+		string p_InstanceName = null;
+		bool p_ScrapFirst = true;
+
+		void InitCounter()
 		{
 			Counter = new System.Diagnostics.PerformanceCounter()
 			{
-				CategoryName = category,
-				CounterName = counter,
-				InstanceName = instance,
-				ReadOnly = true,
+				CategoryName = p_CategoryName,
+				CounterName = p_CounterName,
+				InstanceName = p_InstanceName,
+				ReadOnly = p_ScrapFirst,
 			};
 
-			Sensors.Add(Counter);
-
-			if (scrapfirst)
+			if (p_ScrapFirst)
 			{
 				var scrap = Value;
 			}
+
+			Sensors.Add(Counter);
+		}
+
+		public PerformanceCounterWrapper(string category, string counter, string instance = null, bool scrapfirst = true)
+		{
+			p_CategoryName = category;
+			p_CounterName = counter;
+			p_InstanceName = instance;
+			p_ScrapFirst = scrapfirst;
+			InitCounter();
 		}
 
 		bool disposed = false;
@@ -84,6 +98,8 @@ namespace SystemMonitor
 				}
 				catch (System.InvalidOperationException)
 				{
+					Sensors.Remove(Counter);
+					Counter.Dispose();
 					// TODO: Driver/Adapter vanished and other problems, try to re-acquire it.
 					//Console.WriteLine("DEBUG :: PFC(" + _pfc.CategoryName + "//" + _pfc.CounterName + "//" + _pfc.InstanceName + ") vanished.");
 				}
