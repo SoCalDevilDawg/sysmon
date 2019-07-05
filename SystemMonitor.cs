@@ -4,7 +4,7 @@
 // Author:
 //       M.A. (https://github.com/mkahvi)
 //
-// Copyright (c) 2017 M.A.
+// Copyright (c) 2017–2019 M.A.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -92,11 +92,16 @@ namespace SystemMonitor
 		const float freememthresholddefault = 1.5f;
 		const float freememthresholdmin = 0.5f;
 		const float freememthresholdmax = 4f;
+
+		const bool smallbarsizedefault = false;
+
 		float freememthershold = freememthresholddefault;
 		const float memorypressuredefault = 0.9f;
 		const float memorypressuremin = 0.5f;
 		const float memorypressuremax = 0.99f;
 		float MemoryPressureThreshold = memorypressuredefault;
+
+		public static bool smallbarsize { get; private set; } = smallbarsizedefault;
 
 		float bottleneck_mem = 0, bottleneck_cpu = 0, bottleneck_nvm = 0;
 		float LowMemThreshold = 4;
@@ -137,7 +142,7 @@ namespace SystemMonitor
 
 				ProcessPFC current = null;
 				if (!Processes.ContainsKey(name))
-					Processes.Add(name, (current = new ProcessPFC(name)));
+					Processes.Add(name, current = new ProcessPFC(name));
 				else
 					current = Processes[name];
 
@@ -434,6 +439,8 @@ namespace SystemMonitor
 		MenuItem highpriocmo;
 		MenuItem togglewarn;
 
+		MenuItem toggleSmallBars;
+
 		MenuItem updateFreq05;
 		MenuItem updateFreq15;
 		MenuItem updateFreq25;
@@ -515,14 +522,22 @@ namespace SystemMonitor
 
 			Console.WriteLine("Configuration start.");
 			var settings = System.Configuration.ConfigurationManager.AppSettings;
+
 			string freememthresholdkey = "Free memory threshold";
 			if (settings[freememthresholdkey] == null) settings.Add(freememthresholdkey, (freememthresholddefault).ToString());
 			freememthershold = Convert.ToSingle(settings.Get(freememthresholdkey)).LimitRange(freememthresholdmin, freememthresholdmax);
 			Console.WriteLine("+ Free mem threshold: {0}", freememthershold);
+
 			string memorypressurekey = "Memory pressure";
 			if (settings[memorypressurekey] == null) settings.Add(memorypressurekey, (memorypressuredefault).ToString());
 			MemoryPressureThreshold = Convert.ToSingle(settings.Get(memorypressurekey)).LimitRange(memorypressuremin, memorypressuremax);
 			Console.WriteLine("+ Memory pressure:    {0}", MemoryPressureThreshold);
+
+			string smallbarsizekey = "Small bars";
+			if (settings[smallbarsizekey] is null) settings.Add(smallbarsizekey, smallbarsizedefault.ToString());
+			smallbarsize = settings.Get(smallbarsizekey).Equals(bool.TrueString, StringComparison.InvariantCultureIgnoreCase);
+			Console.WriteLine("~ Small bars: " + smallbarsize);
+
 			/*
 			string positionkey = "Position";
 			//if (settings[positionkey] == null) settings.Add(positionkey, Location.X + "," + Location.Y);
@@ -574,26 +589,26 @@ namespace SystemMonitor
 			//var bottlenecklabel = new SensorHeader { Text = "Bottleneck" };
 			//bottleneckvalue = new SensorValue();
 
-			Sensor_Bottleneck = new SensorChunk("Bottleneck");
+			Sensor_Bottleneck = new SensorChunk("Bottleneck", smallbars: smallbarsize);
 			tooltip.SetToolTip(Sensor_Bottleneck, "The values are arbitrary but usually 6+ is moderate load while 10+ should mean heavy load.");
 
-			Sensor_CPU = new SensorChunk("CPU", true);
+			Sensor_CPU = new SensorChunk("CPU", true, smallbars: smallbarsize);
 			Sensor_CPU.Chart.MaxValue = 100.0; // 100%
 			Sensor_CPU.Chart.StaticRange = true;
 			tooltip.SetToolTip(Sensor_CPU.Value, "Queued command counter is clearest indicator of underscaled CPU.\nInterrupt percentage shows load from peripherals, NICs, extension cards, and such.");
 
-			Sensor_Memory = new SensorChunk("Memory", true, horizontal: true);
+			Sensor_Memory = new SensorChunk("Memory", true, horizontal: true, smallbars: smallbarsize);
 			tooltip.SetToolTip(Sensor_Memory.Value, "Physical memory usage.\nCommit is swap file usage.\nPressure is private memory load.");
 			Sensor_Memory.Chart.MaxValue = TotalMemoryMB;
 
-			Sensor_PageFault = new SensorChunk("Page Faults", true);
+			Sensor_PageFault = new SensorChunk("Page Faults", true, smallbars: smallbarsize);
 			tooltip.SetToolTip(Sensor_PageFault.Value, "Page file performance degradation.\nPage faults themselves are not to worry.\nHard page faults can be source of poor performance.");
 
-			Sensor_NVMIO = new SensorChunk("NVM", true);
+			Sensor_NVMIO = new SensorChunk("NVM", true, smallbars: smallbarsize);
 			tooltip.SetToolTip(Sensor_NVMIO.Header, "Non-volatile memory: HDD, SSD, etc.\nThese are not clear indicators of bottlenecks if multiple NVMs are involved.");
 			tooltip.SetToolTip(Sensor_NVMIO.Value, "Split indicates fragmentation performance loss.\nQueue&delay indicates slow NVM.");
 
-			Sensor_NetIO = new SensorChunk("Network", true);
+			Sensor_NetIO = new SensorChunk("Network", true, smallbars: smallbarsize);
 			tooltip.SetToolTip(Sensor_NetIO.Value, "Queue length is indicator of too slow or bad outbound connection.");
 
 			layout.Controls.Add(Sensor_Bottleneck);
@@ -658,6 +673,14 @@ namespace SystemMonitor
 
 			ContextMenu.MenuItems.Add("-");
 			var n = new System.Windows.Forms.Timer { Interval = 2000 };
+
+			toggleSmallBars = ContextMenu.MenuItems.Add("Small bars", (_, _ea) =>
+			{
+				toggleSmallBars.Checked = !toggleSmallBars.Checked;
+				uSettings.SmallBars = toggleSmallBars.Checked;
+			});
+
+			ContextMenu.MenuItems.Add("-");
 
 			updateFreq05 = ContextMenu.MenuItems.Add("Update 0.5/s", (sender, e) =>
 			{

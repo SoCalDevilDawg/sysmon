@@ -4,7 +4,7 @@
 // Author:
 //       M.A. (https://github.com/mkahvi)
 //
-// Copyright (c) 2017 M.A.
+// Copyright (c) 2017–2019 M.A.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -35,6 +35,7 @@ namespace SystemMonitor
 	public class Settings
 	{
 		public static Ini.Config config;
+
 		public static string datapath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
 															   "MKAh", "SystemMonitor");
 
@@ -123,6 +124,21 @@ namespace SystemMonitor
 				Dirty |= (_UpdateFrequency != value);
 				_UpdateFrequency = value;
 				config["Core"].GetOrSet("Update Frequency", 2500, out _).IntValue = value;
+			}
+		}
+
+		bool _smallbars = false;
+		public bool SmallBars
+		{
+			get
+			{
+				return _smallbars = config["Core"].GetOrSet("Small bars", false, out _).BoolValue;
+			}
+			set
+			{
+				Dirty |= (_smallbars != value);
+				_smallbars = value;
+				config["Core"].GetOrSet("Small bars", 2500, out _).BoolValue = value;
 			}
 		}
 

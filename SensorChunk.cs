@@ -4,7 +4,7 @@
 // Author:
 //       M.A. (https://github.com/mkahvi)
 //
-// Copyright (c) 2017 M.A.
+// Copyright (c) 2017–2019 M.A.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -47,7 +47,7 @@ namespace SystemMonitor
 			return chart.Layout;
 		}
 
-		public SensorChunk(string title, bool chart = false, int width = 160, int height = 80, bool horizontal = false)
+		public SensorChunk(string title, bool chart = false, int width = 160, int height = 80, bool horizontal = false, bool smallbars = false)
 		{
 			Width = width;
 			Height = height;
@@ -71,7 +71,7 @@ namespace SystemMonitor
 			Layout.Controls.Add(Header, 0, 0);
 			if (chart)
 			{
-				Chart = new SensorChart(title, Height, Width, Horizontal);
+				Chart = new SensorChart(title, Height, Width, Horizontal, smallbars);
 				Value.Parent = Chart;
 				Layout.Controls.Add(Chart, 0, 1);
 			}
@@ -185,7 +185,7 @@ namespace SystemMonitor
 				if (MaxValue < newvalue) MaxValue = newvalue;
 				else if (newvalue < (MaxValue * .8))
 				{
-					ReductionCounter += 1;
+					ReductionCounter++;
 					if (ReductionCounter > (MaxPoints/2))
 					{
 						MaxValue *= .8;
@@ -212,7 +212,7 @@ namespace SystemMonitor
 
 		public bool StaticRange = false;
 
-		public SensorChart(string name, int height, int width, bool horizontal = false)
+		public SensorChart(string name, int height, int width, bool horizontal = false, bool smallbars=false)
 		{
 			Horizontal = horizontal;
 
@@ -251,6 +251,10 @@ namespace SystemMonitor
 			{
 				Series.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Bar;
 				MaxPoints = 7;
+			}
+			else // vertical
+			{
+				if (smallbars) MaxPoints *= 2;
 			}
 
 			//var cpulegend = new Legend(skey);

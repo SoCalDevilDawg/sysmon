@@ -34,7 +34,7 @@ using System.Reflection;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("")]
-[assembly: AssemblyCopyright("M.A., 2017")]
+[assembly: AssemblyCopyright("M.A., 2017–2019")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
