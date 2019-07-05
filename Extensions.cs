@@ -4,7 +4,7 @@
 // Author:
 //       M.A. (https://github.com/mkahvi)
 //
-// Copyright (c) 2017 M.A.
+// Copyright (c) 2017–2019 M.A.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+using System.Diagnostics;
+
 namespace SystemMonitor
 {
 	static public class Extensions
@@ -32,5 +34,29 @@ namespace SystemMonitor
 		{
 			return (value < inclusiveMinimum) ? inclusiveMinimum : ((value > inclusiveMaximum) ? inclusiveMaximum : value);
 		}
+
+		public static int ToSimpleInt(this ProcessPriorityClass value)
+			=> value switch
+			{
+				ProcessPriorityClass.Idle => 0,
+				ProcessPriorityClass.BelowNormal => 1,
+				ProcessPriorityClass.AboveNormal => 3,
+				ProcessPriorityClass.High => 4,
+				_ => 2,
+			};
+	}
+
+	public static class ProcessPriority
+	{
+		public static ProcessPriorityClass FromInt(int value)
+			=> value switch
+			{
+				0 => ProcessPriorityClass.Idle,
+				1 => ProcessPriorityClass.BelowNormal,
+				3 => ProcessPriorityClass.AboveNormal,
+				4 => ProcessPriorityClass.High,
+				_ => ProcessPriorityClass.Normal,
+			};
+
 	}
 }

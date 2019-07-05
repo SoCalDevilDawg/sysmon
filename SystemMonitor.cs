@@ -89,21 +89,8 @@ namespace SystemMonitor
 			}
 		}
 
-		const float freememthresholddefault = 1.5f;
-		const float freememthresholdmin = 0.5f;
-		const float freememthresholdmax = 4f;
-
-		const bool smallbarsizedefault = false;
-
-		float freememthershold = freememthresholddefault;
-		const float memorypressuredefault = 0.9f;
-		const float memorypressuremin = 0.5f;
-		const float memorypressuremax = 0.99f;
-		float MemoryPressureThreshold = memorypressuredefault;
-
-		public static bool smallbarsize { get; private set; } = smallbarsizedefault;
-
 		float bottleneck_mem = 0, bottleneck_cpu = 0, bottleneck_nvm = 0;
+
 		float LowMemThreshold = 4;
 		float LowMemMultiplier = 5.2f;
 
@@ -285,7 +272,7 @@ namespace SystemMonitor
 			{
 				if (cpuusaget >= 85.0 || cpuqueuet >= 5.0) Sensor_CPU.Warn();
 
-				if ((memfreet <= freememthershold) || (mempressure >= (MemoryPressureThreshold))) Sensor_Memory.Warn();
+				if ((memfreet <= Settings.Current.FreeMemoryThreshold) || (mempressure >= (Settings.Current.MemoryPressureThreshold))) Sensor_Memory.Warn();
 
 				if (splitiot >= 2 || highavgt >= 45 || nvmtimet >= 20) Sensor_NVMIO.Warn();
 
@@ -439,8 +426,6 @@ namespace SystemMonitor
 		MenuItem highpriocmo;
 		MenuItem togglewarn;
 
-		MenuItem toggleSmallBars;
-
 		MenuItem updateFreq05;
 		MenuItem updateFreq15;
 		MenuItem updateFreq25;
@@ -475,8 +460,6 @@ namespace SystemMonitor
 			}
 			return false;
 		}
-
-		Settings uSettings = new Settings();
 
 		public MainWindow()
 		{
@@ -521,22 +504,9 @@ namespace SystemMonitor
 			// READ CONFIGURATION
 
 			Console.WriteLine("Configuration start.");
-			var settings = System.Configuration.ConfigurationManager.AppSettings;
 
-			string freememthresholdkey = "Free memory threshold";
-			if (settings[freememthresholdkey] == null) settings.Add(freememthresholdkey, (freememthresholddefault).ToString());
-			freememthershold = Convert.ToSingle(settings.Get(freememthresholdkey)).LimitRange(freememthresholdmin, freememthresholdmax);
-			Console.WriteLine("+ Free mem threshold: {0}", freememthershold);
-
-			string memorypressurekey = "Memory pressure";
-			if (settings[memorypressurekey] == null) settings.Add(memorypressurekey, (memorypressuredefault).ToString());
-			MemoryPressureThreshold = Convert.ToSingle(settings.Get(memorypressurekey)).LimitRange(memorypressuremin, memorypressuremax);
-			Console.WriteLine("+ Memory pressure:    {0}", MemoryPressureThreshold);
-
-			string smallbarsizekey = "Small bars";
-			if (settings[smallbarsizekey] is null) settings.Add(smallbarsizekey, smallbarsizedefault.ToString());
-			smallbarsize = settings.Get(smallbarsizekey).Equals(bool.TrueString, StringComparison.InvariantCultureIgnoreCase);
-			Console.WriteLine("~ Small bars: " + smallbarsize);
+			Console.WriteLine($"+ Free mem threshold: {Settings.Current.FreeMemoryThreshold:N2}");
+			Console.WriteLine($"+ Memory pressure:    {Settings.Current.MemoryPressureThreshold:N2}");
 
 			/*
 			string positionkey = "Position";
@@ -589,26 +559,26 @@ namespace SystemMonitor
 			//var bottlenecklabel = new SensorHeader { Text = "Bottleneck" };
 			//bottleneckvalue = new SensorValue();
 
-			Sensor_Bottleneck = new SensorChunk("Bottleneck", smallbars: smallbarsize);
+			Sensor_Bottleneck = new SensorChunk("Bottleneck");
 			tooltip.SetToolTip(Sensor_Bottleneck, "The values are arbitrary but usually 6+ is moderate load while 10+ should mean heavy load.");
 
-			Sensor_CPU = new SensorChunk("CPU", true, smallbars: smallbarsize);
+			Sensor_CPU = new SensorChunk("CPU", true);
 			Sensor_CPU.Chart.MaxValue = 100.0; // 100%
 			Sensor_CPU.Chart.StaticRange = true;
 			tooltip.SetToolTip(Sensor_CPU.Value, "Queued command counter is clearest indicator of underscaled CPU.\nInterrupt percentage shows load from peripherals, NICs, extension cards, and such.");
 
-			Sensor_Memory = new SensorChunk("Memory", true, horizontal: true, smallbars: smallbarsize);
+			Sensor_Memory = new SensorChunk("Memory", true, horizontal: true);
 			tooltip.SetToolTip(Sensor_Memory.Value, "Physical memory usage.\nCommit is swap file usage.\nPressure is private memory load.");
 			Sensor_Memory.Chart.MaxValue = TotalMemoryMB;
 
-			Sensor_PageFault = new SensorChunk("Page Faults", true, smallbars: smallbarsize);
+			Sensor_PageFault = new SensorChunk("Page Faults", true);
 			tooltip.SetToolTip(Sensor_PageFault.Value, "Page file performance degradation.\nPage faults themselves are not to worry.\nHard page faults can be source of poor performance.");
 
-			Sensor_NVMIO = new SensorChunk("NVM", true, smallbars: smallbarsize);
+			Sensor_NVMIO = new SensorChunk("NVM", true);
 			tooltip.SetToolTip(Sensor_NVMIO.Header, "Non-volatile memory: HDD, SSD, etc.\nThese are not clear indicators of bottlenecks if multiple NVMs are involved.");
 			tooltip.SetToolTip(Sensor_NVMIO.Value, "Split indicates fragmentation performance loss.\nQueue&delay indicates slow NVM.");
 
-			Sensor_NetIO = new SensorChunk("Network", true, smallbars: smallbarsize);
+			Sensor_NetIO = new SensorChunk("Network", true);
 			tooltip.SetToolTip(Sensor_NetIO.Value, "Queue length is indicator of too slow or bad outbound connection.");
 
 			layout.Controls.Add(Sensor_Bottleneck);
@@ -633,11 +603,10 @@ namespace SystemMonitor
 			{
 				try
 				{
-					Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
+					Process.GetCurrentProcess().PriorityClass = Settings.Current.SelfPriority = ProcessPriorityClass.High;
 					normpriocmo.Checked = false;
 					highpriocmo.Checked = true;
 					lowpriocmo.Checked = false;
-					uSettings.SelfPriority = ProcessPriorityClass.High;
 				}
 				catch { /* NOP */ }
 				Console.WriteLine("~ Self-priority set to High.");
@@ -646,11 +615,10 @@ namespace SystemMonitor
 			{
 				try
 				{
-					Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.Normal;
+					Process.GetCurrentProcess().PriorityClass = Settings.Current.SelfPriority = ProcessPriorityClass.Normal;
 					normpriocmo.Checked = true;
 					highpriocmo.Checked = false;
 					lowpriocmo.Checked = false;
-					uSettings.SelfPriority = ProcessPriorityClass.Normal;
 				}
 				catch { /* NOP */ }
 				Console.WriteLine("~ Self-priority set to Normal.");
@@ -659,28 +627,17 @@ namespace SystemMonitor
 			{
 				try
 				{
-					Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.Idle;
+					Process.GetCurrentProcess().PriorityClass = Settings.Current.SelfPriority = ProcessPriorityClass.BelowNormal;
 					normpriocmo.Checked = false;
 					highpriocmo.Checked = false;
 					lowpriocmo.Checked = true;
-					uSettings.SelfPriority = ProcessPriorityClass.Idle;
 				}
 				catch { /* NOP */ }
 				Console.WriteLine("~ Self-priority set to Low.");
 			});
 
-			lowpriocmo.Checked = true;
-
 			ContextMenu.MenuItems.Add("-");
 			var n = new System.Windows.Forms.Timer { Interval = 2000 };
-
-			toggleSmallBars = ContextMenu.MenuItems.Add("Small bars", (_, _ea) =>
-			{
-				toggleSmallBars.Checked = !toggleSmallBars.Checked;
-				uSettings.SmallBars = toggleSmallBars.Checked;
-			});
-
-			ContextMenu.MenuItems.Add("-");
 
 			updateFreq05 = ContextMenu.MenuItems.Add("Update 0.5/s", (sender, e) =>
 			{
@@ -688,7 +645,7 @@ namespace SystemMonitor
 				updateFreq05.Checked = true;
 				updateFreq15.Checked = false;
 				updateFreq25.Checked = false;
-				uSettings.UpdateFrequency = n.Interval;
+				Settings.Current.UpdateFrequency = n.Interval;
 			});
 			updateFreq15 = ContextMenu.MenuItems.Add("Update 1.5/s", (sender, e) =>
 			{
@@ -696,7 +653,7 @@ namespace SystemMonitor
 				updateFreq05.Checked = false;
 				updateFreq15.Checked = true;
 				updateFreq25.Checked = false;
-				uSettings.UpdateFrequency = n.Interval;
+				Settings.Current.UpdateFrequency = n.Interval;
 			});
 			updateFreq25 = ContextMenu.MenuItems.Add("Update 2.5/s", (sender, e) =>
 			{
@@ -704,7 +661,7 @@ namespace SystemMonitor
 				updateFreq05.Checked = false;
 				updateFreq15.Checked = false;
 				updateFreq25.Checked = true;
-				uSettings.UpdateFrequency = n.Interval;
+				Settings.Current.UpdateFrequency = n.Interval;
 			});
 
 			ContextMenu.MenuItems.Add("-");
@@ -729,7 +686,7 @@ namespace SystemMonitor
 
 			StartPosition = FormStartPosition.CenterScreen;
 
-			Point startLocation = uSettings.StartLocation;
+			Point startLocation = Settings.Current.StartLocation;
 			if (!startLocation.IsEmpty)
 			{
 				Location = startLocation;
@@ -738,24 +695,23 @@ namespace SystemMonitor
 
 			FormClosing += (sender, e) =>
 			{
-				if (uSettings.StartLocation != Location)
+				if (Settings.Current.StartLocation != Location)
 				{
-					uSettings.StartLocation = Location;
+					Settings.Current.StartLocation = Location;
 				}
 
-				if (uSettings.Dirty)
+				if (Settings.Current.Save())
 				{
-					uSettings.Save();
-					Console.WriteLine("Start Location saved: " + uSettings.StartLocation);
-					Console.WriteLine("Self priority saved:  " + uSettings.SelfPriority);
+					Console.WriteLine("Start Location saved: " + Settings.Current.StartLocation);
+					Console.WriteLine("Self priority saved:  " + Settings.Current.SelfPriority);
 				}
 			};
 
 			Console.WriteLine("Start location: " + Location);
 			Show();
 
-			Console.WriteLine("Self-priority: " + uSettings.SelfPriority);
-			switch (uSettings.SelfPriority)
+			Console.WriteLine("Self-priority: " + Settings.Current.SelfPriority.ToSimpleInt() + " = " + Settings.Current.SelfPriority.ToString());
+			switch (Settings.Current.SelfPriority)
 			{
 				case ProcessPriorityClass.High:
 					highpriocmo.PerformClick();
@@ -763,14 +719,13 @@ namespace SystemMonitor
 				case ProcessPriorityClass.Normal:
 					normpriocmo.PerformClick();
 					break;
-				case ProcessPriorityClass.Idle:
 				default:
 					lowpriocmo.PerformClick();
 					break;
 			}
 
-			Console.WriteLine("Update Frequency: " + uSettings.UpdateFrequency);
-			switch (uSettings.UpdateFrequency)
+			Console.WriteLine("Update Frequency: " + Settings.Current.UpdateFrequency);
+			switch (Settings.Current.UpdateFrequency)
 			{
 				case 500:
 					updateFreq05.PerformClick();

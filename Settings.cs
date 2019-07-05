@@ -34,10 +34,12 @@ namespace SystemMonitor
 {
 	public class Settings
 	{
-		public static Ini.Config config;
+		public static readonly string datapath = System.IO.Path.Combine(
+			Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MKAh", "SystemMonitor");
 
-		public static string datapath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-															   "MKAh", "SystemMonitor");
+		public static Settings Current = new Settings();
+
+		public static Ini.Config config;
 
 		public static void SaveConfig(string configfile, Ini.Config config)
 		{
@@ -51,6 +53,8 @@ namespace SystemMonitor
 
 		public static Ini.Config LoadConfig(string filename)
 		{
+			Debug.WriteLine("Data path: " + datapath);
+			Debug.WriteLine("Data file: " + filename);
 			string path = System.IO.Path.Combine(datapath, filename);
 			//Log.Trace("Opening: "+path);
 			Ini.Config retcfg;
@@ -67,78 +71,97 @@ namespace SystemMonitor
 
 		public Settings() => Load();
 
-		public bool Dirty { get; set; } = false;
-
-		Point _StartLocation = Point.Empty;
+		Point? _StartLocation = null;
 		public Point StartLocation
 		{
 			get
 			{
-				if (_StartLocation.IsEmpty)
+				if (!_StartLocation.HasValue)
 				{
-					string t = config.Get("Core")?.Get("Start Location")?.Value ?? "0,0";
+					string t = config.Get("Core")?.Get("Start Location")?.String ?? "0,0";
 					string[] values = t.Split(new string[] { "," }, 2, StringSplitOptions.RemoveEmptyEntries);
 					int x = Convert.ToInt32(values[0]), y = Convert.ToInt32(values[1]);
 					_StartLocation = new Point(x, y);
 				}
-				return _StartLocation;
+
+				return _StartLocation.Value;
 			}
 			set
 			{
-				Dirty |= (_StartLocation != value);
-				_StartLocation = value;
-				config["Core"].GetOrSet("Start Location", "0,0", out _).Value = (_StartLocation.X + "," + _StartLocation.Y);
+				StartLocation = value;
+				config["Core"]["Start Location"].String = $"{value.X},{value.Y}";
 			}
 		}
 
-		ProcessPriorityClass _SelfPriority = ProcessPriorityClass.RealTime;
+		ProcessPriorityClass? _processpriority = null;
+
 		public ProcessPriorityClass SelfPriority
 		{
 			get
 			{
-				if (_SelfPriority == ProcessPriorityClass.RealTime)
-					_SelfPriority = (ProcessPriorityClass)(config.Get("Core")?.GetOrSet("Self Priority", (int)ProcessPriorityClass.Idle, out _)?.IntValue ?? 2);
-				if (_SelfPriority == ProcessPriorityClass.RealTime)
-					_SelfPriority = ProcessPriorityClass.Idle;
+				if (!_processpriority.HasValue)
+					_processpriority = ProcessPriority.FromInt(config["Core"].GetOrSet("Self priority", ProcessPriorityClass.BelowNormal.ToSimpleInt()).Int.Constrain(0, 4));
 
-				return _SelfPriority;
+				return _processpriority.Value;
 			}
 			set
 			{
-				Dirty |= (_SelfPriority != value);
-				_SelfPriority = value;
-				config["Core"].GetOrSet("Self Priority", (int)ProcessPriorityClass.Idle, out _).IntValue = (int)_SelfPriority;
+				_processpriority = value;
+				config["Core"]["Self Priority"].Int = value.ToSimpleInt();
 			}
 		}
 
-		private int _UpdateFrequency = 0;
+		int? _updatefrequency = null;
+
 		public int UpdateFrequency
 		{
 			get
 			{
-				if (_UpdateFrequency == 0) _UpdateFrequency = config["Core"].GetOrSet("Update Frequency", 2500, out _).IntValue;
-				return _UpdateFrequency;
+				if (!_updatefrequency.HasValue)
+					_updatefrequency = config["Core"].GetOrSet("Update frequency", 2500).Int.Constrain(100, 5000);
+
+				return _updatefrequency.Value;
 			}
 			set
 			{
-				Dirty |= (_UpdateFrequency != value);
-				_UpdateFrequency = value;
-				config["Core"].GetOrSet("Update Frequency", 2500, out _).IntValue = value;
+				_updatefrequency = value;
+				config["Core"]["Update frequency"].Int = value;
 			}
 		}
 
-		bool _smallbars = false;
-		public bool SmallBars
+		double? _freememorythreshold = null;
+
+		public double FreeMemoryThreshold
 		{
 			get
 			{
-				return _smallbars = config["Core"].GetOrSet("Small bars", false, out _).BoolValue;
+				if (!_freememorythreshold.HasValue)
+					_freememorythreshold = config["Core"].GetOrSet("Free memory threshold", 1.5d).Double.Constrain(0.5d, 4d);
+
+				return _freememorythreshold.Value;
 			}
 			set
 			{
-				Dirty |= (_smallbars != value);
-				_smallbars = value;
-				config["Core"].GetOrSet("Small bars", 2500, out _).BoolValue = value;
+				_freememorythreshold = value;
+				config["Core"]["Free memory threshold"].Double = value;
+			}
+		}
+
+		double? _memorypressurethreshold = null;
+
+		public double MemoryPressureThreshold
+		{
+			get
+			{
+				if (!_memorypressurethreshold.HasValue)
+					_memorypressurethreshold = config["Core"].GetOrSet("Memory pressure threshold", 0.9d).Double.Constrain(0.5d, 0.99d);
+
+				return _memorypressurethreshold.Value;
+			}
+			set
+			{
+				_memorypressurethreshold = value;
+				config["Core"]["Memory pressure threshold"].Double = value;
 			}
 		}
 
@@ -146,6 +169,15 @@ namespace SystemMonitor
 
 		public void Load() => config = LoadConfig(CoreConfigFile);
 
-		public void Save() => SaveConfig(CoreConfigFile, config);
+		public bool Save()
+		{
+			if (config.Changes > 0)
+			{
+				SaveConfig(CoreConfigFile, config);
+				return true;
+			}
+
+			return false;
+		}
 	}
 }

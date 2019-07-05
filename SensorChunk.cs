@@ -47,7 +47,7 @@ namespace SystemMonitor
 			return chart.Layout;
 		}
 
-		public SensorChunk(string title, bool chart = false, int width = 160, int height = 80, bool horizontal = false, bool smallbars = false)
+		public SensorChunk(string title, bool chart = false, int width = 160, int height = 80, bool horizontal = false)
 		{
 			Width = width;
 			Height = height;
@@ -71,7 +71,7 @@ namespace SystemMonitor
 			Layout.Controls.Add(Header, 0, 0);
 			if (chart)
 			{
-				Chart = new SensorChart(title, Height, Width, Horizontal, smallbars);
+				Chart = new SensorChart(title, Height, Width, Horizontal);
 				Value.Parent = Chart;
 				Layout.Controls.Add(Chart, 0, 1);
 			}
@@ -164,7 +164,7 @@ namespace SystemMonitor
 
 		bool Horizontal = false;
 
-		int MaxPoints = 10;
+		int MaxPoints = 25;
 
 		public Control Control
 		{
@@ -200,19 +200,23 @@ namespace SystemMonitor
 
 		public double MaxValue
 		{
-			get
-			{
-				return ChartArea.AxisY.Maximum;
-			}
+			get => ChartArea.AxisY.Maximum;
+			set => ChartArea.AxisY.Maximum = value;
+		}
+
+		public int Maximum
+		{
+			get => MaxPoints;
 			set
 			{
-				ChartArea.AxisY.Maximum = value;
+				MaxPoints = value;
+				ChartArea.AxisX.Maximum = (Horizontal ? MaxPoints : MaxPoints + 1);
 			}
 		}
 
 		public bool StaticRange = false;
 
-		public SensorChart(string name, int height, int width, bool horizontal = false, bool smallbars=false)
+		public SensorChart(string name, int height, int width, bool horizontal = false)
 		{
 			Horizontal = horizontal;
 
@@ -250,11 +254,7 @@ namespace SystemMonitor
 			if (horizontal)
 			{
 				Series.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Bar;
-				MaxPoints = 7;
-			}
-			else // vertical
-			{
-				if (smallbars) MaxPoints *= 2;
+				MaxPoints = 9;
 			}
 
 			//var cpulegend = new Legend(skey);
