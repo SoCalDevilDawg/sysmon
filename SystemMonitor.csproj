@@ -57,6 +57,7 @@
     <Compile Include="MKAh\Data\Ini\Setting.cs" />
     <Compile Include="MKAh\Data\Ini\SettingType.cs" />
     <Compile Include="MKAh\Extensions\CoreExtensions.cs" />
+    <Compile Include="Support.cs" />
     <Compile Include="SystemMonitor.cs" />
     <Compile Include="PerformanceCounterWrapper.cs" />
     <Compile Include="SensorChunk.cs" />

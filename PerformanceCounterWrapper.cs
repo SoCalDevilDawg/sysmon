@@ -36,10 +36,10 @@ namespace SystemMonitor
 
 		public PerformanceCounter Counter { get; private set; }
 
-		string p_CategoryName = null;
-		string p_CounterName = null;
+		readonly string p_CategoryName;
+		readonly string p_CounterName;
 		string p_InstanceName = null;
-		bool p_ScrapFirst = true;
+		readonly bool p_ScrapFirst;
 
 		void InitCounter()
 		{

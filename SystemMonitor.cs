@@ -30,6 +30,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Management;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace SystemMonitor
@@ -172,9 +173,13 @@ namespace SystemMonitor
 			// PrivateMemorySize64
 		}
 
+		Support support = new Support();
+
 		void UpdateSensors()
 		{
-			var cpuusaget = cpuusage.Value;
+			//var cpuusaget = cpuusage.Value;
+			var cpuusaget = support.UsageFromIdle(support.Idle());
+
 			/*
 			string[] coreusaget = new string[cores];
 			for (int i = 0; i < cores; i++)
@@ -186,10 +191,12 @@ namespace SystemMonitor
 			var cpuqueuet = cpuqueue.Value;
 			var interruptt = interrupt.Value;
 
+			/*
 			if (float.IsNaN(cpuusaget) || float.IsNaN(cpuqueuet) || float.IsNaN(interruptt))
 			{
 				// TODO: Handle this
 			}
+			*/
 
 			//Sensor_CPU.Value.Text = string.Format("{0:N1}%\n{1}\n{2} queued\n{3:N1}% interrupt", cpuusaget, coreusagett, cpuqueuet, interruptt);
 			Sensor_CPU.Value.Text = string.Format("{0:N1}%\n{1} queued\n{2:N1}% interrupt", cpuusaget, cpuqueuet, interruptt);
@@ -198,15 +205,25 @@ namespace SystemMonitor
 			bottleneck_cpu = cpucurve + (cpuqueuet / 2) + (interruptt / 4);
 			Sensor_CPU.Chart.Add(cpuusaget);
 
+			UpdateMemory(out var memfreetb, out var memtotaltb);
+
+			const float bytesToGBDivisor = 1024f * 1024f * 1024f;
+
+			//float memusedt = (memtotaltb - memfreetb) / bytesToGBDivisor; // used mem
+			float memfreet = memfreetb / bytesToGBDivisor; // free mem in GB
+
 			// Actual as reported, and memory as determined programmatically. The difference is likely disk caching space.
 			// Memory pressure going over the "true" value is likely going to result in poor performance.
 			float privmem = privatememory.Value;
-			float memfreet = memfree.Value / 1024; // free memory in GB
+
+			//float memfreet = memfree.Value / 1024; // free memory in GB
 			float mempressure = (privmem / TotalMemory);
-			float memfreert = (TotalMemory - privmem) / 1024000000;
-			Sensor_Memory.Value.Text = string.Format("{0:N2} GiB free\n{1:N1}% commit\n{2:N1}% pressure",
-													 memfreet, memcommit.Value, mempressure * 100);
+			//float memfreert = (TotalMemory - privmem) / 1024000000;
+
+			Sensor_Memory.Value.Text = $"{memfreet:N2} GiB free\n{memcommit.Value:N1}% commit\n{mempressure * 100f:N1}% pressure";
+
 			var tempmem = (TotalMemoryMB) - (memfreet * 1000);
+
 			Sensor_Memory.Chart.Add(tempmem);
 
 			// BOTTLENECK :: MEM
@@ -221,8 +238,7 @@ namespace SystemMonitor
 			var nvmbytesr = nvmbytes.Value;
 			var nvmbytest = nvmbytesr / 1000000;
 			var nvmtransferst = nvmtransfers.Value;
-			Sensor_NVMIO.Value.Text = string.Format("{0:N2} MB\n{1:N1} transfers\n{2:N1}ms delay\n{3:N2} splits\n{4} queued",
-													nvmbytest, nvmtransferst, highavgt, splitiot, nvmqueuet);
+			Sensor_NVMIO.Value.Text = $"{nvmbytest:N2} MB\n{nvmtransferst:N1} transfers\n{highavgt:N1}ms delay\n{splitiot:N2} splits\n{nvmqueuet} queued";
 			Sensor_NVMIO.Chart.Add(nvmbytest);
 
 			// Disk time >20%
@@ -349,6 +365,7 @@ namespace SystemMonitor
 			Console.WriteLine("Initializing counters...");
 
 			cpuusage = new PerformanceCounterWrapper("Processor", "% Processor Time", "_Total");
+
 			/*
 			var cpus = new PerformanceCounterCategory("Processor").GetInstanceNames();
 			cores = cpus.Count() - 1;
@@ -362,7 +379,7 @@ namespace SystemMonitor
 			//new PerformanceCounterWrapper("Process", "Private Bytes", "processnamewithoutexe");
 			//new PerformanceCounterWrapper("PhysicalDisk", "Disk Bytes/sec", "processnamewithoutexe");
 
-			memfree = new PerformanceCounterWrapper("Memory", "Available MBytes", null);
+			//memfree = new PerformanceCounterWrapper("Memory", "Available MBytes", null);
 			//var memfree = new PerformanceCounterWrapper("Memory", "Available Bytes", null);
 
 			memcommit = new PerformanceCounterWrapper("Memory", "% Committed Bytes In Use", null); // swap usage?
@@ -755,9 +772,7 @@ namespace SystemMonitor
 
 			try
 			{
-				MainWindow win = null;
-				win = new MainWindow();
-				if (win != null) System.Windows.Forms.Application.Run(win);
+				System.Windows.Forms.Application.Run(new MainWindow());
 			}
 			finally
 			{
@@ -776,5 +791,68 @@ namespace SystemMonitor
 				Console.WriteLine("Exiting.");
 			}
 		}
+
+		static MemoryStatusEx mem = new MemoryStatusEx { dwLength = (uint)Marshal.SizeOf(typeof(MemoryStatusEx)) };
+
+		void UpdateMemory(out ulong freebytes, out ulong totalbytes)
+		{
+			GlobalMemoryStatusEx(ref mem);
+
+			totalbytes = mem.ullTotalPhys;
+			freebytes = mem.ullAvailPhys;
+		}
+
+		// https://docs.microsoft.com/en-us/windows/desktop/api/sysinfoapi/ns-sysinfoapi-_memorystatusex
+		[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+		internal struct MemoryStatusEx
+		{
+			// size of the structure in bytes. Used by C functions
+			public uint dwLength;
+
+			/// <summary>
+			/// 0 to 100, percentage of memory usage
+			/// </summary>
+			public uint dwMemoryLoad;
+
+			/// <summary>
+			/// Total size of physical memory, in bytes.
+			/// </summary>
+			public ulong ullTotalPhys;
+
+			/// <summary>
+			/// Size of physical memory available, in bytes.
+			/// </summary>
+			public ulong ullAvailPhys;
+
+			/// <summary>
+			/// Size of the committed memory limit, in bytes. This is physical memory plus the size of the page file, minus a small overhead.
+			/// </summary>
+			public ulong ullTotalPageFile;
+
+			/// <summary>
+			/// Size of available memory to commit, in bytes. The limit is ullTotalPageFile.
+			/// </summary>
+			public ulong ullAvailPageFile;
+
+			/// <summary>
+			/// Total size of the user mode portion of the virtual address space of the calling process, in bytes.
+			/// </summary>
+			public ulong ullTotalVirtual;
+
+			/// <summary>
+			/// Size of unreserved and uncommitted memory in the user mode portion of the virtual address space of the calling process, in bytes.
+			/// </summary>
+			public ulong ullAvailVirtual;
+
+			/// <summary>
+			/// Size of unreserved and uncommitted memory in the extended portion of the virtual address space of the calling process, in bytes.
+			/// </summary>
+			public ulong ullAvailExtendedVirtual;
+		}
+
+		// https://docs.microsoft.com/en-us/windows/desktop/api/sysinfoapi/nf-sysinfoapi-globalmemorystatusex
+		[return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+		[System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+		static internal extern bool GlobalMemoryStatusEx(ref MemoryStatusEx lpBuffer);
 	}
 }
