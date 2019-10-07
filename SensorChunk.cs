@@ -27,6 +27,7 @@
 using System;
 using System.Windows.Forms;
 using System.Drawing;
+using System.Diagnostics;
 
 namespace SystemMonitor
 {
@@ -72,15 +73,19 @@ namespace SystemMonitor
 			if (chart)
 			{
 				Chart = new SensorChart(title, Height, Width, Horizontal);
+				Chart.MinValue = 0.0d;
+
 				Value.Parent = Chart;
 				Layout.Controls.Add(Chart, 0, 1);
 			}
 			else
 				Layout.Controls.Add(Value, 0, 1);
 
-			wth = new Timer();
-			wth.Interval = 2100;
-			wth.Tick += (object sender, EventArgs e) => Normal();
+			wth = new Timer
+			{
+				Interval = 2100
+			};
+			wth.Tick += (_, _ea) => Normal();
 			wth.Enabled = true;
 			wth.Stop();
 		}
@@ -88,6 +93,7 @@ namespace SystemMonitor
 		protected System.Drawing.Color WarnColor = Color.IndianRed;
 
 		readonly Timer wth;
+
 		public void Warn()
 		{
 			wth.Stop();
@@ -177,31 +183,49 @@ namespace SystemMonitor
 		int ReductionCounter = 0;
 		public void Add(double newvalue)
 		{
-			Chart.SuspendLayout();
-			Series.Points.AddY(newvalue);
-			if ((Horizontal && Series.Points.Count > 1) || Series.Points.Count > MaxPoints) Series.Points.RemoveAt(0);
-			if (!StaticRange)
+			try
 			{
-				if (MaxValue < newvalue) MaxValue = newvalue;
-				else if (newvalue < (MaxValue * .8))
+				Chart.SuspendLayout();
+
+				Series.Points.AddY(newvalue);
+
+				if ((Horizontal && Series.Points.Count > 1) || Series.Points.Count > MaxPoints) Series.Points.RemoveAt(0);
+				if (!StaticRange)
 				{
-					ReductionCounter++;
-					if (ReductionCounter > (MaxPoints/2))
+					if (MaxValue < newvalue)
+						MaxValue = newvalue + double.Epsilon;
+					else if (newvalue < (MaxValue * .8))
 					{
-						MaxValue *= .8;
-						ReductionCounter = 0;
+						ReductionCounter++;
+						if (ReductionCounter > (MaxPoints / 2))
+						{
+							MaxValue *= .8;
+							ReductionCounter = 0;
+						}
 					}
+					else
+						ReductionCounter = 0;
 				}
-				else
-					ReductionCounter = 0;
+
+				Chart.ResumeLayout();
 			}
-			Chart.ResumeLayout();
+			catch (Exception ex)
+			{
+				Debug.WriteLine(ex.Message);
+				Debug.WriteLine(ex.StackTrace);
+			}
 		}
 
 		public double MaxValue
 		{
 			get => ChartArea.AxisY.Maximum;
-			set => ChartArea.AxisY.Maximum = value;
+			set => ChartArea.AxisY.Maximum = value + double.Epsilon;
+		}
+
+		public double MinValue
+		{
+			get => ChartArea.AxisY.Minimum;
+			set => ChartArea.AxisY.Minimum = value;
 		}
 
 		public int Maximum
@@ -223,7 +247,7 @@ namespace SystemMonitor
 			Chart = new System.Windows.Forms.DataVisualization.Charting.Chart
 			{
 				BackColor = Color.Transparent,
-				///Dock = DockStyle.Fill,
+				Dock = DockStyle.Fill,
 				//ForeColor = Color.Blue,
 				BackHatchStyle = System.Windows.Forms.DataVisualization.Charting.ChartHatchStyle.None,
 				Height = height,

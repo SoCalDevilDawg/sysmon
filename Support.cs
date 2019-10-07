@@ -10,23 +10,28 @@ namespace SystemMonitor
 {
 	public class Support
 	{
+		public Support() => Idle();
+
 		readonly Stopwatch stopwatch = Stopwatch.StartNew();
-		long oldIdleMs, oldUsedMs;
+		long oldIdleMs = 0, oldUsedMs;
 
 		public float UsageFromIdle(float idle) => (1f - idle) * 100f;
 
+		readonly int CoreCount = Environment.ProcessorCount;
+
 		public float Idle()
 		{
+
 			var period = stopwatch.ElapsedMilliseconds;
 			GetSystemTimes(out var idle, out var kernel, out var user);
 			stopwatch.Restart();
 			long newIdleMs = FiletimeToLong(idle);
-			long newUsedMs = (FiletimeToLong(user) + FiletimeToLong(kernel));
+			//long newUsedMs = (FiletimeToLong(user) + FiletimeToLong(kernel)); // unused
 
-			var usedMs = (newUsedMs - oldUsedMs) / (10_000 * Environment.ProcessorCount);
-			var idleMs = (newIdleMs - oldIdleMs) / (10_000 * Environment.ProcessorCount);
+			//var usedMs = (newUsedMs - oldUsedMs) / (10_000 * Environment.ProcessorCount); // unused
+			var idleMs = (newIdleMs - oldIdleMs) / (10_000 * CoreCount);
 			oldIdleMs = newIdleMs;
-			oldUsedMs = newUsedMs;
+			//oldUsedMs = newUsedMs; // unused
 
 			//Logging.DebugMsg("CPU --- idle: " + idleMs.ToString() + " --- used: " + usedMs.ToString() + " --- " + period.ToString() + " --- % = " + ((float)idleMs / period).ToString("N1"));
 

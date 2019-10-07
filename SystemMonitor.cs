@@ -298,12 +298,12 @@ namespace SystemMonitor
 			// CheckLoaders();
 		}
 
-		PerformanceCounterWrapper cpuusage;
+		//PerformanceCounterWrapper cpuusage; // unused
 		//PerformanceCounterWrapper[] coreusage;
 		PerformanceCounterWrapper cpuqueue;
 		PerformanceCounterWrapper interrupt;
 
-		PerformanceCounterWrapper memfree;
+		//PerformanceCounterWrapper memfree; // unused
 		PerformanceCounterWrapper memcommit;
 		PerformanceCounterWrapper privatememory;
 
@@ -364,7 +364,7 @@ namespace SystemMonitor
 		{
 			Console.WriteLine("Initializing counters...");
 
-			cpuusage = new PerformanceCounterWrapper("Processor", "% Processor Time", "_Total");
+			//cpuusage = new PerformanceCounterWrapper("Processor", "% Processor Time", "_Total");
 
 			/*
 			var cpus = new PerformanceCounterCategory("Processor").GetInstanceNames();
@@ -415,15 +415,9 @@ namespace SystemMonitor
 			Console.WriteLine("Initialization complete.");
 		}
 
-		ulong TotalMemory = 0;
-		ulong TotalMemoryMB = 0;
+		ulong TotalMemory = 0, TotalMemoryMB = 0;
 
-		SensorChunk Sensor_Bottleneck;
-		SensorChunk Sensor_CPU;
-		SensorChunk Sensor_Memory;
-		SensorChunk Sensor_PageFault;
-		SensorChunk Sensor_NVMIO;
-		SensorChunk Sensor_NetIO;
+		SensorChunk Sensor_Bottleneck, Sensor_CPU, Sensor_Memory, Sensor_PageFault, Sensor_NVMIO, Sensor_NetIO;
 
 		bool disposed = false;
 
@@ -438,14 +432,9 @@ namespace SystemMonitor
 			}
 		}
 
-		MenuItem lowpriocmo;
-		MenuItem normpriocmo;
-		MenuItem highpriocmo;
-		MenuItem togglewarn;
-
-		MenuItem updateFreq05;
-		MenuItem updateFreq15;
-		MenuItem updateFreq25;
+		readonly MenuItem
+			lowpriocmo, normpriocmo, highpriocmo, togglewarn,
+			updateFreq05, updateFreq15, updateFreq25;
 
 		bool FlashWarnings = true;
 
@@ -580,7 +569,7 @@ namespace SystemMonitor
 			tooltip.SetToolTip(Sensor_Bottleneck, "The values are arbitrary but usually 6+ is moderate load while 10+ should mean heavy load.");
 
 			Sensor_CPU = new SensorChunk("CPU", true);
-			Sensor_CPU.Chart.MaxValue = 100.0; // 100%
+			Sensor_CPU.Chart.MaxValue = 100.0d; // 100%
 			Sensor_CPU.Chart.StaticRange = true;
 			tooltip.SetToolTip(Sensor_CPU.Value, "Queued command counter is clearest indicator of underscaled CPU.\nInterrupt percentage shows load from peripherals, NICs, extension cards, and such.");
 
