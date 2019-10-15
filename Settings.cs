@@ -88,7 +88,7 @@ namespace SystemMonitor
 			}
 			set
 			{
-				StartLocation = value;
+				_StartLocation = value;
 				config["Core"]["Start Location"].String = $"{value.X},{value.Y}";
 			}
 		}
