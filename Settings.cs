@@ -71,6 +71,168 @@ namespace SystemMonitor
 
 		public Settings() => Load();
 
+		bool? _alwaysontop = null;
+		public bool AlwaysOnTop
+		{
+			get
+			{
+				if (!_alwaysontop.HasValue)
+				{
+					_alwaysontop = config.Get("Core")?.Get("Always on top")?.Bool ?? false;
+				}
+
+				return _alwaysontop.Value;
+			}
+			set
+			{
+				config["Core"]["Always on top"].Bool = value;
+
+				_alwaysontop = value;
+			}
+		}
+
+		string ColorToString(Color value) => $"{value.R.ToString()},{value.G.ToString()},{value.B.ToString()}";
+
+		Color StringToColor(string value)
+		{
+			string[] values = value.Trim().Split(new string[] { "," }, 3, StringSplitOptions.RemoveEmptyEntries);
+			int r = Convert.ToInt32(values[0].Trim()), g = Convert.ToInt32(values[1].Trim()), b = Convert.ToInt32(values[2].Trim());
+			return Color.FromArgb(r, g, b);
+		}
+
+		void WriteStack(Exception ex)
+		{
+			Debug.WriteLine("- - - - -");
+			Debug.WriteLine("EXCEPTION");
+			Debug.WriteLine(ex.Message);
+			Debug.WriteLine("- - - - -");
+			Debug.WriteLine(ex.StackTrace);
+			Debug.WriteLine("- - - - -");
+		}
+
+		Color? _BackColor = null;
+		public Color BackColor
+		{
+			get
+			{
+				if (!_BackColor.HasValue)
+				{
+					string? color = config.Get("Color")?.Get("Background").String;
+					try
+					{
+						if (!string.IsNullOrEmpty(color)) _BackColor = StringToColor(color);
+						else Console.WriteLine("Backcolor color configuration invalid");
+					}
+					catch (Exception ex)
+					{
+						WriteStack(ex);
+					}
+
+					if (!_BackColor.HasValue) _BackColor = Color.DarkSlateGray;
+					else Console.WriteLine("Custom back color: " + _BackColor.Value.ToString());
+				}
+
+				return _BackColor.Value;
+			}
+			set
+			{
+				config["Color"]["Background"].String = ColorToString(value);
+				_BackColor = value;
+			}
+		}
+
+		Color? _WarnColor = null;
+		public Color WarnColor
+		{
+			get
+			{
+				if (!_WarnColor.HasValue)
+				{
+					string? color = config.Get("Color")?.Get("Warning").String;
+					try
+					{
+						if (!string.IsNullOrEmpty(color)) _WarnColor = StringToColor(color);
+						else Console.WriteLine("Warning color configuration invalid");
+					}
+					catch (Exception ex)
+					{
+						WriteStack(ex);
+					}
+
+					if (!_WarnColor.HasValue) _WarnColor = Color.IndianRed;
+					else Console.WriteLine("Custom warning color: " + _WarnColor.Value.ToString());
+				}
+
+				return _WarnColor.Value;
+			}
+			set
+			{
+				config["Color"]["Warning"].String = ColorToString(value);
+				_WarnColor = value;
+			}
+		}
+
+		Color? _TextColor = null;
+		public Color TextColor
+		{
+			get
+			{
+				if (!_TextColor.HasValue)
+				{
+					string? color = config.Get("Color")?.Get("Text").String;
+					try
+					{
+						if (!string.IsNullOrEmpty(color)) _TextColor = StringToColor(color);
+						else Console.WriteLine("Text color configuration invalid");
+					}
+					catch (Exception ex)
+					{
+						WriteStack(ex);
+					}
+
+					if (!_TextColor.HasValue) _TextColor = Color.White;
+					else Console.WriteLine("Custom text color: " + _BackColor.Value.ToString());
+				}
+
+				return _TextColor.Value;
+			}
+			set
+			{
+				config["Color"]["Text"].String = ColorToString(value);
+				_TextColor = value;
+			}
+		}
+		Color? _GraphColor = null;
+		public Color GraphColor
+		{
+			get
+			{
+				if (!_GraphColor.HasValue)
+				{
+					string? color = config.Get("Color")?.Get("Graphs").String;
+					try
+					{
+						if (!string.IsNullOrEmpty(color)) _GraphColor = StringToColor(color);
+						else Console.WriteLine("Graph color configuration invalid");
+					}
+					catch (Exception ex)
+					{
+						WriteStack(ex);
+					}
+
+					if (!_GraphColor.HasValue) _GraphColor = Color.RosyBrown;
+					else Console.WriteLine("Custom graph color: " + _BackColor.Value.ToString());
+				}
+
+				return _GraphColor.Value;
+			}
+			set
+			{
+				config["Color"]["Graphs"].String = ColorToString(value);
+				_GraphColor = value;
+			}
+		}
+
 		Point? _StartLocation = null;
 		public Point StartLocation
 		{
@@ -79,8 +241,8 @@ namespace SystemMonitor
 				if (!_StartLocation.HasValue)
 				{
 					string t = config.Get("Core")?.Get("Start Location")?.String ?? "0,0";
-					string[] values = t.Split(new string[] { "," }, 2, StringSplitOptions.RemoveEmptyEntries);
-					int x = Convert.ToInt32(values[0]), y = Convert.ToInt32(values[1]);
+					string[] values = t.Trim().Split(new string[] { "," }, 2, StringSplitOptions.RemoveEmptyEntries);
+					int x = Convert.ToInt32(values[0].Trim()), y = Convert.ToInt32(values[1].Trim());
 					_StartLocation = new Point(x, y);
 				}
 

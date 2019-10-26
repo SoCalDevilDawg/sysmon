@@ -90,15 +90,13 @@ namespace SystemMonitor
 			wth.Stop();
 		}
 
-		protected System.Drawing.Color WarnColor = Color.IndianRed;
-
 		readonly Timer wth;
 
 		public void Warn()
 		{
 			wth.Stop();
 			wth.Start();
-			Layout.BackColor = WarnColor;
+			Layout.BackColor = Settings.Current.WarnColor;
 		}
 
 		public void Normal()
@@ -136,7 +134,7 @@ namespace SystemMonitor
 		public SensorHeader()
 		{
 			BackColor = Color.Transparent;
-			ForeColor = Color.White;
+			ForeColor = Settings.Current.TextColor;
 
 			Text = "N/A";
 
@@ -258,7 +256,7 @@ namespace SystemMonitor
 			Series = new System.Windows.Forms.DataVisualization.Charting.Series
 			{
 				Name = skey,
-				Color = Color.RosyBrown,
+				Color = Settings.Current.GraphColor,
 				BorderColor = Color.Transparent,
 				IsVisibleInLegend = false,
 				IsXValueIndexed = true,

@@ -481,7 +481,8 @@ namespace SystemMonitor
 			AutoSize = true;
 			Size = new System.Drawing.Size(650, 136);
 			Padding = new Padding(3);
-			BackColor = Color.DarkSlateGray;
+
+			BackColor = Settings.Current.BackColor;
 
 			Console.WriteLine("Analyzing system...");
 			try
@@ -671,12 +672,21 @@ namespace SystemMonitor
 			});
 
 			ContextMenu.MenuItems.Add("-");
+
+			var alwaysOnTop = ContextMenu.MenuItems.Add("Always on top");
+			alwaysOnTop.Click += (_, _ea) =>
+			{
+				Settings.Current.AlwaysOnTop = TopMost = alwaysOnTop.Checked = !TopMost;
+				Console.WriteLine("Topmost toggled to: " + TopMost);
+			};
+
 			MenuItem runatstart = ContextMenu.MenuItems.Add("Run at Windows startup");
 			runatstart.Click += (sender, e) =>
 			{
 				runatstart.Checked = RunAtStart(!runatstart.Checked);
 			};
 			runatstart.Checked = RunAtStart(true, true);
+
 			ContextMenu.MenuItems.Add("-");
 			ContextMenu.MenuItems.Add("Exit", (sender, e) => Close());
 
@@ -699,6 +709,9 @@ namespace SystemMonitor
 				StartPosition = FormStartPosition.Manual;
 			}
 
+			alwaysOnTop.Checked = TopMost = Settings.Current.AlwaysOnTop;
+			Console.WriteLine("Topmost: " + TopMost.ToString());
+
 			FormClosing += (sender, e) =>
 			{
 				if (Settings.Current.StartLocation != Location)
@@ -706,10 +719,31 @@ namespace SystemMonitor
 					Settings.Current.StartLocation = Location;
 				}
 
+				if (Settings.Current.AlwaysOnTop != TopMost)
+				{
+					Settings.Current.AlwaysOnTop = TopMost;
+				}
+
 				if (Settings.Current.Save())
 				{
-					Console.WriteLine("Start Location saved: " + Settings.Current.StartLocation);
-					Console.WriteLine("Self priority saved:  " + Settings.Current.SelfPriority);
+					Console.WriteLine("Start Location saved: " + Settings.Current.StartLocation.ToString());
+					Console.WriteLine("Always on top saved:  " + Settings.Current.AlwaysOnTop.ToString());
+					Console.WriteLine("Self priority saved:  " + Settings.Current.SelfPriority.ToString());
+					Console.WriteLine();
+					Console.WriteLine("Background color: " + Settings.Current.BackColor.ToString());
+					Console.WriteLine("Warning color:    " + Settings.Current.WarnColor.ToString());
+					Console.WriteLine("Text color:       " + Settings.Current.TextColor.ToString());
+					Console.WriteLine("Graph color:      " + Settings.Current.GraphColor.ToString());
+				}
+			};
+
+			Activated += (_, _ea) =>
+			{
+				// Refresh topmost as it is known to be finicky.
+				if (TopMost)
+				{
+					TopMost = false;
+					TopMost = true;
 				}
 			};
 

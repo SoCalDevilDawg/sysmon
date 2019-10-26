@@ -87,5 +87,10 @@
   <ItemGroup>
     <Folder Include="MKAh\File\Ini\" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="Example.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>

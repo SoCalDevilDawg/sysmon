@@ -1,0 +1,7 @@
+﻿Add the following in %APPDATA%\MKAh\SystemMonitor\Core.ini to configure colors.
+
+[Color]
+Background = 30,60,60 # DarkSlateGray (#2F4F4F = 47,79,79)
+Warning = 220,90,90 # IndianRed (#CD5C5C = 205,92,92)
+Graphs = 200,200,150 # RosyBrown (#BC8F8F = 188,143,143)
+Text = 255,255,255 # White (#FFFFFF = 255,255,255)
