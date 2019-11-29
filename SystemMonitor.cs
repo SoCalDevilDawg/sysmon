@@ -228,8 +228,8 @@ namespace SystemMonitor
 
 			// BOTTLENECK :: MEM
 			bottleneck_mem =
-				(mempressure / 10) // memory pressure default by %
-				+ (Math.Max(0, LowMemThreshold - memfreet) * LowMemMultiplier);
+				(mempressure * 10f) // 1 to 0 memory pressure into 10 to 0 scale.
+				+ ((LowMemThreshold - memfreet) * LowMemMultiplier).Min(0f); // low memory
 
 			var splitiot = splitio.Value;
 			var highavgt = Math.Max(avgnvmread.Value * 1000, avgnvmwrite.Value * 1000);
