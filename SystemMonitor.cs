@@ -201,7 +201,12 @@ namespace SystemMonitor
 			*/
 
 			//Sensor_CPU.Value.Text = string.Format("{0:N1}%\n{1}\n{2} queued\n{3:N1}% interrupt", cpuusaget, coreusagett, cpuqueuet, interruptt);
-			Sensor_CPU.Value.Text = string.Format("{0:N1}%\n{1} queued\n{2:N1}% interrupt", cpuusaget, cpuqueuet, interruptt);
+
+			if (AdminSensors)
+				Sensor_CPU.Value.Text = string.Format("{0:N1}%\n{1:N0} C\n{2} queued\n{3:N1}% interrupt", cpuusaget, HWmon.CPUTemperature, cpuqueuet, interruptt);
+			else
+				Sensor_CPU.Value.Text = string.Format("{0:N1}%\n{1} queued\n{2:N1}% interrupt", cpuusaget, cpuqueuet, interruptt);
+
 			// BOTTLENECK :: CPU
 			float cpucurve = (Convert.ToSingle(Math.Pow(((cpuusaget / 100f) + 0.4f), 7.1f)) - ((cpuusaget / 100f) / 10f)).LimitRange(0f, 10f);
 			bottleneck_cpu = cpucurve + (cpuqueuet / 2) + (interruptt / 4);
@@ -277,7 +282,7 @@ namespace SystemMonitor
 
 			// GPU
 			float bottleneck_gpu = float.MinValue, gpuload = float.MinValue, gpumem = float.MinValue;
-			if (GPUSensors)
+			if (OHWSensors)
 			{
 				UpdateGPU(out gpuload, out gpumem);
 				bottleneck_gpu = gpuload + gpumem;
@@ -295,7 +300,7 @@ namespace SystemMonitor
 			else
 				Sensor_Bottleneck.Value.Text = "---";
 
-			if (GPUSensors)
+			if (OHWSensors)
 				Sensor_Bottleneck.Value.Text += string.Format("\nMEM: {0:N1}\nNVM: {1:N1}\nCPU: {2:N1}\nGPU: {3:N1}", bottleneck_mem, bottleneck_nvm, bottleneck_cpu, bottleneck_gpu);
 			else
 				Sensor_Bottleneck.Value.Text += string.Format("\nMEM: {0:N1}\nNVM: {1:N1}\nCPU: {2:N1}", bottleneck_mem, bottleneck_nvm, bottleneck_cpu);
@@ -310,7 +315,7 @@ namespace SystemMonitor
 
 				if (Math.Max(Math.Max(bottleneck_cpu, bottleneck_nvm), bottleneck_mem) >= 6) Sensor_Bottleneck.Warn();
 
-				if (GPUSensors)
+				if (OHWSensors)
 				{
 					if (gpuload >= 8.5f) Sensor_GPU_Load.Warn();
 					if (gpumem >= 8.5f) Sensor_GPU_MEM.Warn();
@@ -435,9 +440,11 @@ namespace SystemMonitor
 			Console.WriteLine("Bandwidth: {0:N0} kB", netband.Value/1000);
 			*/
 
-			if (GPUSensors)
+			if (OHWSensors)
 			{
 				HWmon = new OHW();
+
+				AdminSensors = MKAh.Execution.IsAdministrator;
 			}
 
 			Console.WriteLine("Initialization complete.");
@@ -447,7 +454,8 @@ namespace SystemMonitor
 
 		SensorChunk Sensor_Bottleneck, Sensor_CPU, Sensor_Memory, Sensor_PageFault, Sensor_NVMIO, Sensor_NetIO, Sensor_GPU_MEM, Sensor_GPU_Load;
 
-		bool GPUSensors = false;
+		bool OHWSensors = false;
+		bool AdminSensors = false;
 
 		readonly OpenHardwareMonitor.Hardware.Computer computer; // OHW
 
@@ -499,9 +507,9 @@ namespace SystemMonitor
 			return false;
 		}
 
-		public MainWindow(bool gpusensors)
+		public MainWindow(bool ohwsensors)
 		{
-			GPUSensors = gpusensors;
+			OHWSensors = ohwsensors;
 
 			Text = "System Monitor";
 			WindowState = FormWindowState.Normal;
@@ -612,7 +620,7 @@ namespace SystemMonitor
 			tooltip.SetToolTip(Sensor_Memory.Value, "Physical memory usage.\nCommit is swap file usage.\nPressure is private memory load.");
 			Sensor_Memory.Chart.MaxValue = TotalMemoryMB;
 
-			if (GPUSensors)
+			if (OHWSensors)
 			{
 				Sensor_GPU_MEM = new SensorChunk("GPU MEM", chart: true, horizontal: true);
 				Sensor_GPU_MEM.Chart.MaxValue = 100.0d;
@@ -636,7 +644,7 @@ namespace SystemMonitor
 			layout.Controls.Add(Sensor_Bottleneck);
 			layout.Controls.Add(Sensor_CPU);
 			layout.Controls.Add(Sensor_Memory);
-			if (GPUSensors)
+			if (OHWSensors)
 			{
 				layout.Controls.Add(Sensor_GPU_Load);
 				layout.Controls.Add(Sensor_GPU_MEM);

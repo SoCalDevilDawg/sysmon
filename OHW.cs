@@ -86,6 +86,15 @@ namespace SystemMonitor
 
 					switch (hw.HardwareType)
 					{
+						case OpenHardwareMonitor.Hardware.HardwareType.CPU:
+							// only load and clock sensors normally
+							// temperature sensor requires admin rights
+							foreach (var sensor in hw.Sensors)
+							{
+								if (sensor.SensorType == OpenHardwareMonitor.Hardware.SensorType.Temperature)
+									cpuTemp = sensor;
+							}
+							break;
 						case OpenHardwareMonitor.Hardware.HardwareType.GpuAti:
 						case OpenHardwareMonitor.Hardware.HardwareType.GpuNvidia:
 							GPUName = hw.Name;
@@ -175,6 +184,8 @@ namespace SystemMonitor
 
 		public float GPUTemperature => gpuTmp?.Value ?? float.NaN;
 
+		public float CPUTemperature => cpuTemp?.Value ?? float.NaN;
+
 		/// <summary>
 		/// 100f to 0f % GPU load.
 		/// </summary>
@@ -192,7 +203,8 @@ namespace SystemMonitor
 			gpuMemLoad = null, // Free Memory
 			gpuClock = null, // Core clock speed
 			gpuLoad = null, // Core % load
-			gpuMemCtrl = null; // Memory Controller
+			gpuMemCtrl = null, // Memory Controller
+			cpuTemp = null; // CPU temperature
 
 		#region IDisposable Support
 		private bool Disposed = false;
