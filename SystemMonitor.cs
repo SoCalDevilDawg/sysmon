@@ -443,7 +443,6 @@ namespace SystemMonitor
 			if (OHWSensors)
 			{
 				HWmon = new OHW();
-
 				AdminSensors = MKAh.Execution.IsAdministrator;
 			}
 
@@ -456,8 +455,6 @@ namespace SystemMonitor
 
 		bool OHWSensors = false;
 		bool AdminSensors = false;
-
-		readonly OpenHardwareMonitor.Hardware.Computer computer; // OHW
 
 		bool disposed = false;
 
