@@ -1,5 +1,5 @@
 ﻿//
-// MainWindow.cs
+// SystemMonitor.cs
 //
 // Author:
 //       M.A. (https://github.com/mkahvi)
@@ -24,6 +24,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+using MKAh;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -32,6 +33,7 @@ using System.Linq;
 using System.Management;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using static MKAh.CoreTypeExtensions;
 
 namespace SystemMonitor
 {
@@ -273,6 +275,14 @@ namespace SystemMonitor
 			double curnetio = netoutt + netint;
 			Sensor_NetIO.Chart.Add(curnetio);
 
+			// GPU
+			float bottleneck_gpu = float.MinValue, gpuload = float.MinValue, gpumem = float.MinValue;
+			if (GPUSensors)
+			{
+				UpdateGPU(out gpuload, out gpumem);
+				bottleneck_gpu = gpuload + gpumem;
+			}
+
 			// TODO: Make this more dynamic
 			if (bottleneck_mem >= 8)
 				Sensor_Bottleneck.Value.Text = "MEM";
@@ -280,9 +290,15 @@ namespace SystemMonitor
 				Sensor_Bottleneck.Value.Text = "NVM";
 			else if (bottleneck_cpu >= 8)
 				Sensor_Bottleneck.Value.Text = "CPU";
+			else if (bottleneck_gpu >= 8)
+				Sensor_Bottleneck.Value.Text = "GPU";
 			else
 				Sensor_Bottleneck.Value.Text = "---";
-			Sensor_Bottleneck.Value.Text += string.Format("\nMEM: {0:N1}\nNVM: {1:N1}\nCPU: {2:N1}", bottleneck_mem, bottleneck_nvm, bottleneck_cpu);
+
+			if (GPUSensors)
+				Sensor_Bottleneck.Value.Text += string.Format("\nMEM: {0:N1}\nNVM: {1:N1}\nCPU: {2:N1}\nGPU: {3:N1}", bottleneck_mem, bottleneck_nvm, bottleneck_cpu, bottleneck_gpu);
+			else
+				Sensor_Bottleneck.Value.Text += string.Format("\nMEM: {0:N1}\nNVM: {1:N1}\nCPU: {2:N1}", bottleneck_mem, bottleneck_nvm, bottleneck_cpu);
 
 			if (FlashWarnings)
 			{
@@ -293,6 +309,12 @@ namespace SystemMonitor
 				if (splitiot >= 2 || highavgt >= 45 || nvmtimet >= 20) Sensor_NVMIO.Warn();
 
 				if (Math.Max(Math.Max(bottleneck_cpu, bottleneck_nvm), bottleneck_mem) >= 6) Sensor_Bottleneck.Warn();
+
+				if (GPUSensors)
+				{
+					if (gpuload >= 8.5f) Sensor_GPU_Load.Warn();
+					if (gpumem >= 8.5f) Sensor_GPU_MEM.Warn();
+				}
 			}
 
 			// CheckLoaders();
@@ -326,6 +348,7 @@ namespace SystemMonitor
 		// ISR : Interrupt Service Routine - delay
 		// Kernel latency
 
+		OHW? HWmon = null;
 
 		int cores;
 
@@ -412,12 +435,21 @@ namespace SystemMonitor
 			Console.WriteLine("Bandwidth: {0:N0} kB", netband.Value/1000);
 			*/
 
+			if (GPUSensors)
+			{
+				HWmon = new OHW();
+			}
+
 			Console.WriteLine("Initialization complete.");
 		}
 
 		ulong TotalMemory = 0, TotalMemoryMB = 0;
 
-		SensorChunk Sensor_Bottleneck, Sensor_CPU, Sensor_Memory, Sensor_PageFault, Sensor_NVMIO, Sensor_NetIO;
+		SensorChunk Sensor_Bottleneck, Sensor_CPU, Sensor_Memory, Sensor_PageFault, Sensor_NVMIO, Sensor_NetIO, Sensor_GPU_MEM, Sensor_GPU_Load;
+
+		bool GPUSensors = false;
+
+		readonly OpenHardwareMonitor.Hardware.Computer computer; // OHW
 
 		bool disposed = false;
 
@@ -467,8 +499,10 @@ namespace SystemMonitor
 			return false;
 		}
 
-		public MainWindow()
+		public MainWindow(bool gpusensors)
 		{
+			GPUSensors = gpusensors;
+
 			Text = "System Monitor";
 			WindowState = FormWindowState.Normal;
 			FormBorderStyle = FormBorderStyle.SizableToolWindow; // no min/max buttons as wanted
@@ -569,28 +603,44 @@ namespace SystemMonitor
 			Sensor_Bottleneck = new SensorChunk("Bottleneck");
 			tooltip.SetToolTip(Sensor_Bottleneck, "The values are arbitrary but usually 6+ is moderate load while 10+ should mean heavy load.");
 
-			Sensor_CPU = new SensorChunk("CPU", true);
+			Sensor_CPU = new SensorChunk("CPU", chart: true);
 			Sensor_CPU.Chart.MaxValue = 100.0d; // 100%
 			Sensor_CPU.Chart.StaticRange = true;
 			tooltip.SetToolTip(Sensor_CPU.Value, "Queued command counter is clearest indicator of underscaled CPU.\nInterrupt percentage shows load from peripherals, NICs, extension cards, and such.");
 
-			Sensor_Memory = new SensorChunk("Memory", true, horizontal: true);
+			Sensor_Memory = new SensorChunk("Memory", chart: true, horizontal: true);
 			tooltip.SetToolTip(Sensor_Memory.Value, "Physical memory usage.\nCommit is swap file usage.\nPressure is private memory load.");
 			Sensor_Memory.Chart.MaxValue = TotalMemoryMB;
 
-			Sensor_PageFault = new SensorChunk("Page Faults", true);
+			if (GPUSensors)
+			{
+				Sensor_GPU_MEM = new SensorChunk("GPU MEM", chart: true, horizontal: true);
+				Sensor_GPU_MEM.Chart.MaxValue = 100.0d;
+				Sensor_GPU_MEM.Chart.StaticRange = true;
+
+				Sensor_GPU_Load = new SensorChunk("GPU Load", chart: true);
+				Sensor_GPU_Load.Chart.MaxValue = 100.0d;
+				Sensor_GPU_Load.Chart.StaticRange = true;
+			}
+
+			Sensor_PageFault = new SensorChunk("Page Faults", chart: true);
 			tooltip.SetToolTip(Sensor_PageFault.Value, "Page file performance degradation.\nPage faults themselves are not to worry.\nHard page faults can be source of poor performance.");
 
-			Sensor_NVMIO = new SensorChunk("NVM", true);
+			Sensor_NVMIO = new SensorChunk("NVM", chart: true);
 			tooltip.SetToolTip(Sensor_NVMIO.Header, "Non-volatile memory: HDD, SSD, etc.\nThese are not clear indicators of bottlenecks if multiple NVMs are involved.");
 			tooltip.SetToolTip(Sensor_NVMIO.Value, "Split indicates fragmentation performance loss.\nQueue&delay indicates slow NVM.");
 
-			Sensor_NetIO = new SensorChunk("Network", true);
+			Sensor_NetIO = new SensorChunk("Network", chart: true);
 			tooltip.SetToolTip(Sensor_NetIO.Value, "Queue length is indicator of too slow or bad outbound connection.");
 
 			layout.Controls.Add(Sensor_Bottleneck);
 			layout.Controls.Add(Sensor_CPU);
 			layout.Controls.Add(Sensor_Memory);
+			if (GPUSensors)
+			{
+				layout.Controls.Add(Sensor_GPU_Load);
+				layout.Controls.Add(Sensor_GPU_MEM);
+			}
 			layout.Controls.Add(Sensor_PageFault);
 			layout.Controls.Add(Sensor_NVMIO);
 			layout.Controls.Add(Sensor_NetIO);
@@ -784,18 +834,30 @@ namespace SystemMonitor
 
 		public static string AppPath;
 
-		[STAThread]
-		public static void Main()
-		{
-			Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.Idle; // set self to low priority
+		static MainWindow mainwindow;
 
+		static void Setup()
+		{
 			//Console.WriteLine(Application.LocalUserAppDataPath);
 			AppPath = System.IO.Directory.GetParent(Application.LocalUserAppDataPath).ToString();
 			Console.WriteLine(AppPath);
 
+			bool OHWPresent = System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(
+	System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName), "OpenHardwareMonitorLib.dll"));
+
+			Console.WriteLine("OHW present: " + OHWPresent.ToString());
+
+			mainwindow = new MainWindow(OHWPresent);
+		}
+
+		[STAThread]
+		public static void Main()
+		{
+			Setup();
+
 			try
 			{
-				System.Windows.Forms.Application.Run(new MainWindow());
+				System.Windows.Forms.Application.Run(mainwindow);
 			}
 			finally
 			{
@@ -823,6 +885,32 @@ namespace SystemMonitor
 
 			totalbytes = mem.ullTotalPhys;
 			freebytes = mem.ullAvailPhys;
+		}
+
+		void UpdateGPU(out float load, out float mem)
+		{
+			HWmon.Update();
+
+			float
+				vramTotalGB = HWmon.GPUTotalMemory / 1024f,
+				gpuMemLoad = HWmon.GPUMemoryLoad,
+				vramUsed = vramTotalGB * (gpuMemLoad / 100f),
+				vramFree = vramTotalGB - vramUsed,
+				gpuMemCtrl = HWmon.GPUMemCtrlLoad,
+				gpuLoad = HWmon.GPULoad,
+				gpuTemp = HWmon.GPUTemperature,
+				gpuFanRPM = HWmon.GPUFanSpeed,
+				gpuFanLoad = HWmon.GPUFanLoad,
+				gpuClock = HWmon.GPUClock;
+
+			Sensor_GPU_MEM.Chart.Add(gpuMemLoad);
+			Sensor_GPU_MEM.Value.Text = $"{vramFree:N2} GiB free\n{gpuMemLoad:N1} % usage\n{gpuMemCtrl:N1} % Ctrl";
+
+			Sensor_GPU_Load.Chart.Add(gpuLoad);
+			Sensor_GPU_Load.Value.Text = $"{gpuLoad:N1} %\n{gpuClock:N0} MHz\n{gpuTemp:N1} C\n{gpuFanRPM:N0} RPM [{gpuFanLoad:N0}%]";
+
+			load = gpuLoad / 10f;
+			mem = ((gpuMemLoad / 10f) - 7f).Min(0f) + (gpuMemCtrl / 10f);
 		}
 
 		// https://docs.microsoft.com/en-us/windows/desktop/api/sysinfoapi/ns-sysinfoapi-_memorystatusex

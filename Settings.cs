@@ -24,10 +24,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+using MKAh;
 using System;
 using System.Diagnostics;
 using System.Drawing;
-using MKAh;
 using Ini = MKAh.Ini;
 
 namespace SystemMonitor
