@@ -343,6 +343,22 @@ namespace SystemMonitor
 			}
 		}
 
+		string? _nicdevice = null;
+		public string NICDevice
+		{
+			get
+			{
+				if (string.IsNullOrEmpty(_nicdevice))
+					_nicdevice = config["Core"].GetOrSet("Network device", "").String;
+				return _nicdevice;
+			}
+			set
+			{
+				_nicdevice = value;
+				config["Core"]["Network device"].String = value;
+			}
+		}
+
 		const string CoreConfigFile = "Core.ini";
 
 		public void Load() => config = LoadConfig(CoreConfigFile);

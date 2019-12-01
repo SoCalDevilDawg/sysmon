@@ -277,11 +277,14 @@ namespace SystemMonitor
 			}
 
 			// NETWORK
-			var netint = netin.Value / 1000;
-			var netoutt = netout.Value / 1000;
-			Sensor_NetIO.Value.Text = string.Format("{0:N1} kB In\n{1:N1} kB Out\n{2} queued", netint, netoutt, netqueue.Value);
-			double curnetio = netoutt + netint;
-			Sensor_NetIO.Chart.Add(curnetio);
+			if (netin != null)
+			{
+				var netint = netin.Value / 1000;
+				var netoutt = netout.Value / 1000;
+				Sensor_NetIO.Value.Text = string.Format("{0:N1} kB In\n{1:N1} kB Out\n{2} queued", netint, netoutt, netqueue.Value);
+				double curnetio = netoutt + netint;
+				Sensor_NetIO.Chart.Add(curnetio);
+			}
 
 			// GPU
 			float bottleneck_gpu = float.MinValue, gpuload = float.MinValue, gpumem = float.MinValue;
@@ -422,10 +425,32 @@ namespace SystemMonitor
 			nvmtime = new PerformanceCounterWrapper("PhysicalDisk", "% Disk Time", "_Total");
 			nvmqueue = new PerformanceCounterWrapper("PhysicalDisk", "Current Disk Queue Length", "_Total"); // > 5 bad
 
-			var nic = new PerformanceCounterCategory("Network Interface").GetInstanceNames()[1]; // 0 = loopback
-			netin = new PerformanceCounterWrapper("Network Interface", "Bytes Received/sec", nic);
-			netout = new PerformanceCounterWrapper("Network Interface", "Bytes Sent/sec", nic);
-			netqueue = new PerformanceCounterWrapper("Network Interface", "Output Queue Length", nic);
+			var nics = new PerformanceCounterCategory("Network Interface").GetInstanceNames(); // 0 = loopback
+			string oldNIC = Settings.Current.NICDevice;
+			bool nicFound = false;
+			string nic = string.Empty;
+			for (int i = 1; i < nics.Length; i++)
+			{
+				if (nics[i] == oldNIC)
+				{
+					nic = oldNIC;
+					nicFound = true;
+					break;
+				}
+			}
+
+			if (!nicFound)
+			{
+				nic = nics[1];
+				Settings.Current.NICDevice = nic;
+			}
+
+			if (!string.IsNullOrEmpty(Settings.Current.NICDevice))
+			{
+				netin = new PerformanceCounterWrapper("Network Interface", "Bytes Received/sec", nic);
+				netout = new PerformanceCounterWrapper("Network Interface", "Bytes Sent/sec", nic);
+				netqueue = new PerformanceCounterWrapper("Network Interface", "Output Queue Length", nic);
+			}
 
 			splitio = new PerformanceCounterWrapper("LogicalDisk", "Split IO/sec", "_Total");
 			nvmtransfers = new PerformanceCounterWrapper("LogicalDisk", "Disk Transfers/sec", "_Total");
@@ -742,6 +767,41 @@ namespace SystemMonitor
 
 			ContextMenu.MenuItems.Add("-");
 
+			var nicDevice = ContextMenu.MenuItems.Add("Network device");
+			var nicDevices = new PerformanceCounterCategory("Network Interface").GetInstanceNames(); // 0 = loopback
+			var currentDevice = Settings.Current.NICDevice;
+			bool foundNIC = false;
+			for (int i = 1; i < nicDevices.Length; i++)
+			{
+				var nnic = nicDevice.MenuItems.Add(i + ": " + nicDevices[i]);
+				if (currentDevice == nicDevices[i])
+				{
+					nnic.Checked = true;
+					nnic.Enabled = false;
+					foundNIC = true;
+				}
+
+				nnic.Click += (_, _ea) =>
+				{
+					var rv = MessageBox.Show("Changing network device requires restart", "Restart required", MessageBoxButtons.OKCancel);
+					if (rv == DialogResult.OK)
+					{
+						Settings.Current.NICDevice = nicDevices[i];
+						Console.WriteLine("Restarting");
+						Settings.Current.Save();
+						Application.Restart();
+					}
+				};
+			}
+
+			if (!foundNIC) // default
+			{
+				var dnic = nicDevice.MenuItems[0];
+				dnic.Checked = true;
+				dnic.Enabled = false;
+				Settings.Current.NICDevice = nicDevices[0];
+			}
+
 			var pageFaults = ContextMenu.MenuItems.Add("Page faults");
 			pageFaults.Click += (_, _ea) =>
 			{
@@ -752,6 +812,7 @@ namespace SystemMonitor
 					Settings.Current.PageFaultsEnabled = pageFaults.Checked = !pageFaults.Checked;
 					Console.WriteLine("Show Page Faults toggled to: " + pageFaults.Checked);
 					Console.WriteLine("Restarting");
+					Settings.Current.Save();
 					Application.Restart();
 				}
 			};
@@ -784,13 +845,18 @@ namespace SystemMonitor
 					pi.UseShellExecute = true;
 					pi.Verb = "runas";
 					Process.Start(pi);
+					Settings.Current.Save();
 					Close();
 				};
 			}
 			else
 				adminRestart.Enabled = false;
 
-			ContextMenu.MenuItems.Add("Exit", (_, _ea) => Close());
+			ContextMenu.MenuItems.Add("Exit", (_, _ea) =>
+			{
+				Settings.Current.Save();
+				Close();
+			});
 
 			//Console.WriteLine("Total physical memory: {0:N2} GiB", TotalMemoryMB/1000);
 
