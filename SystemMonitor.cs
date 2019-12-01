@@ -504,6 +504,8 @@ namespace SystemMonitor
 			return false;
 		}
 
+		System.Windows.Forms.Timer UITimer;
+
 		public MainWindow(bool ohwsensors)
 		{
 			OHWSensors = ohwsensors;
@@ -699,31 +701,31 @@ namespace SystemMonitor
 			});
 
 			ContextMenu.MenuItems.Add("-");
-			var n = new System.Windows.Forms.Timer { Interval = 2000 };
+			UITimer = new System.Windows.Forms.Timer { Interval = 2000 };
 
 			updateFreq05 = ContextMenu.MenuItems.Add("Update 0.5/s", (sender, e) =>
 			{
-				n.Interval = 500;
+				UITimer.Interval = 500;
 				updateFreq05.Checked = true;
 				updateFreq15.Checked = false;
 				updateFreq25.Checked = false;
-				Settings.Current.UpdateFrequency = n.Interval;
+				Settings.Current.UpdateFrequency = UITimer.Interval;
 			});
 			updateFreq15 = ContextMenu.MenuItems.Add("Update 1.5/s", (sender, e) =>
 			{
-				n.Interval = 1500;
+				UITimer.Interval = 1500;
 				updateFreq05.Checked = false;
 				updateFreq15.Checked = true;
 				updateFreq25.Checked = false;
-				Settings.Current.UpdateFrequency = n.Interval;
+				Settings.Current.UpdateFrequency = UITimer.Interval;
 			});
 			updateFreq25 = ContextMenu.MenuItems.Add("Update 2.5/s", (sender, e) =>
 			{
-				n.Interval = 2500;
+				UITimer.Interval = 2500;
 				updateFreq05.Checked = false;
 				updateFreq15.Checked = false;
 				updateFreq25.Checked = true;
-				Settings.Current.UpdateFrequency = n.Interval;
+				Settings.Current.UpdateFrequency = UITimer.Interval;
 			});
 
 			ContextMenu.MenuItems.Add("-");
@@ -747,10 +749,10 @@ namespace SystemMonitor
 
 			//Console.WriteLine("Total physical memory: {0:N2} GiB", TotalMemoryMB/1000);
 
-			n.Tick += (sender, e) => UpdateSensors();
+			UITimer.Tick += (sender, e) => UpdateSensors();
 
 			UpdateSensors();
-			n.Enabled = true;
+			UITimer.Enabled = true;
 			Console.WriteLine("Timer started.");
 
 			//CenterToScreen();
