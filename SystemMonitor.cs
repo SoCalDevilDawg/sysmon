@@ -914,7 +914,7 @@ namespace SystemMonitor
 			Sensor_GPU_MEM.Value.Text = $"{vramFree:N2} GiB free\n{gpuMemLoad:N1} % usage\n{gpuMemCtrl:N1} % Ctrl";
 
 			Sensor_GPU_Load.Chart.Add(gpuLoad);
-			Sensor_GPU_Load.Value.Text = $"{gpuLoad:N1} %\n{gpuClock:N0} MHz\n{gpuTemp:N1} C\n{gpuFanRPM:N0} RPM [{gpuFanLoad:N0}%]";
+			Sensor_GPU_Load.Value.Text = $"{gpuLoad:N1} %\n{gpuTemp:N1} C\n{gpuClock:N0} MHz\n{gpuFanRPM:N0} RPM [{gpuFanLoad:N0}%]";
 
 			load = gpuLoad / 10f;
 			mem = ((gpuMemLoad / 10f) - 7f).Min(0f) + (gpuMemCtrl / 10f);
