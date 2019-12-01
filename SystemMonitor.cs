@@ -255,22 +255,25 @@ namespace SystemMonitor
 			bottleneck_nvm = nvmqueuet.LimitRange(0, 8) + (splitiot * 0.3f).LimitRange(0, 4) + (highavgt * 0.08f) + (nvmtransferst / 500).LimitRange(0, 1);
 
 			// PAGE FAULTS
-			var faultcount = pagefault.Value;
-			var pagereadcount = pagereads.Value;
-			if (float.IsNaN(faultcount) || float.IsNaN(pagereadcount))
+			if (Settings.Current.PageFaultsEnabled)
 			{
-				// TODO: Handle error
-				Sensor_PageFault.Value.Text = "ERROR";
-				Sensor_PageFault.Chart.Add(0);
-			}
-			else
-			{
-				Sensor_PageFault.Value.Text = string.Format("{0:N1} reads/sec\n{1:N2}% hard faults\n{2:N2}% NVM use",
-															pagereadcount, (faultcount <= 0.0001 ? 0 : (pagereadcount / faultcount)), (nvmbytesr <= 0.0001 ? 0 : ((pagereadcount * 4048) / nvmbytesr)));
-				//Console.WriteLine("Page Faults = " + pf);
-				//Console.WriteLine("Page Reads  = " + pr);
-				//Console.WriteLine("Page Fault % = " + (pf / pr));
-				Sensor_PageFault.Chart.Add(faultcount <= 0.0001 ? 0 : (pagereadcount / faultcount));
+				var faultcount = pagefault.Value;
+				var pagereadcount = pagereads.Value;
+				if (float.IsNaN(faultcount) || float.IsNaN(pagereadcount))
+				{
+					// TODO: Handle error
+					Sensor_PageFault.Value.Text = "ERROR";
+					Sensor_PageFault.Chart.Add(0);
+				}
+				else
+				{
+					Sensor_PageFault.Value.Text = string.Format("{0:N1} reads/sec\n{1:N2}% hard faults\n{2:N2}% NVM use",
+																pagereadcount, (faultcount <= 0.0001 ? 0 : (pagereadcount / faultcount)), (nvmbytesr <= 0.0001 ? 0 : ((pagereadcount * 4048) / nvmbytesr)));
+					//Console.WriteLine("Page Faults = " + pf);
+					//Console.WriteLine("Page Reads  = " + pr);
+					//Console.WriteLine("Page Fault % = " + (pf / pr));
+					Sensor_PageFault.Chart.Add(faultcount <= 0.0001 ? 0 : (pagereadcount / faultcount));
+				}
 			}
 
 			// NETWORK
@@ -431,8 +434,11 @@ namespace SystemMonitor
 
 			interrupt = new PerformanceCounterWrapper("Processor", "% Interrupt Time", "_Total");
 
-			pagefault = new PerformanceCounterWrapper("Memory", "Page Faults/sec", null);
-			pagereads = new PerformanceCounterWrapper("Memory", "Page Reads/sec", null);
+			if (Settings.Current.PageFaultsEnabled)
+			{
+				pagefault = new PerformanceCounterWrapper("Memory", "Page Faults/sec", null);
+				pagereads = new PerformanceCounterWrapper("Memory", "Page Reads/sec", null);
+			}
 
 			/*
 			// Unreliable if router is involved.
@@ -630,8 +636,11 @@ namespace SystemMonitor
 				Sensor_GPU_Load.Chart.StaticRange = true;
 			}
 
-			Sensor_PageFault = new SensorChunk("Page Faults", chart: true);
-			tooltip.SetToolTip(Sensor_PageFault.Value, "Page file performance degradation.\nPage faults themselves are not to worry.\nHard page faults can be source of poor performance.");
+			if (Settings.Current.PageFaultsEnabled)
+			{
+				Sensor_PageFault = new SensorChunk("Page Faults", chart: true);
+				tooltip.SetToolTip(Sensor_PageFault.Value, "Page file performance degradation.\nPage faults themselves are not to worry.\nHard page faults can be source of poor performance.");
+			}
 
 			Sensor_NVMIO = new SensorChunk("NVM", chart: true);
 			tooltip.SetToolTip(Sensor_NVMIO.Header, "Non-volatile memory: HDD, SSD, etc.\nThese are not clear indicators of bottlenecks if multiple NVMs are involved.");
@@ -648,7 +657,10 @@ namespace SystemMonitor
 				layout.Controls.Add(Sensor_GPU_Load);
 				layout.Controls.Add(Sensor_GPU_MEM);
 			}
-			layout.Controls.Add(Sensor_PageFault);
+			if (Settings.Current.PageFaultsEnabled)
+			{
+				layout.Controls.Add(Sensor_PageFault);
+			}
 			layout.Controls.Add(Sensor_NVMIO);
 			layout.Controls.Add(Sensor_NetIO);
 
@@ -730,6 +742,23 @@ namespace SystemMonitor
 
 			ContextMenu.MenuItems.Add("-");
 
+			var pageFaults = ContextMenu.MenuItems.Add("Page faults");
+			pageFaults.Click += (_, _ea) =>
+			{
+				var rv = MessageBox.Show("Toggling page faults requires restarting.", "Restart required", MessageBoxButtons.OKCancel);
+				if (rv == DialogResult.OK)
+				{
+					UITimer.Stop();
+					Settings.Current.PageFaultsEnabled = pageFaults.Checked = !pageFaults.Checked;
+					Console.WriteLine("Show Page Faults toggled to: " + pageFaults.Checked);
+					Console.WriteLine("Restarting");
+					Application.Restart();
+				}
+			};
+			pageFaults.Checked = Settings.Current.PageFaultsEnabled;
+
+			ContextMenu.MenuItems.Add("-");
+
 			var alwaysOnTop = ContextMenu.MenuItems.Add("Always on top");
 			alwaysOnTop.Click += (_, _ea) =>
 			{
@@ -745,7 +774,23 @@ namespace SystemMonitor
 			runatstart.Checked = RunAtStart(true, true);
 
 			ContextMenu.MenuItems.Add("-");
-			ContextMenu.MenuItems.Add("Exit", (sender, e) => Close());
+			var adminRestart = ContextMenu.MenuItems.Add("Restart as admin");
+			if (!MKAh.Execution.IsAdministrator)
+			{
+				adminRestart.Click += (_, _ea) =>
+				{
+					UITimer.Stop();
+					var pi = new ProcessStartInfo(Application.ExecutablePath);
+					pi.UseShellExecute = true;
+					pi.Verb = "runas";
+					Process.Start(pi);
+					Close();
+				};
+			}
+			else
+				adminRestart.Enabled = false;
+
+			ContextMenu.MenuItems.Add("Exit", (_, _ea) => Close());
 
 			//Console.WriteLine("Total physical memory: {0:N2} GiB", TotalMemoryMB/1000);
 

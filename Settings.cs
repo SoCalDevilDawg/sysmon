@@ -327,6 +327,22 @@ namespace SystemMonitor
 			}
 		}
 
+		bool? _pagefaultsenabled = null;
+		public bool PageFaultsEnabled
+		{
+			get
+			{
+				if (!_pagefaultsenabled.HasValue)
+					_pagefaultsenabled = config["Core"].GetOrSet("Show Page Faults", false).Bool;
+				return _pagefaultsenabled.Value;
+			}
+			set
+			{
+				_pagefaultsenabled = value;
+				config["Core"]["Show Page Faults"].Bool = value;
+			}
+		}
+
 		const string CoreConfigFile = "Core.ini";
 
 		public void Load() => config = LoadConfig(CoreConfigFile);
