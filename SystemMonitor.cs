@@ -82,6 +82,8 @@ namespace SystemMonitor
 
 	public class MainWindow : Form
 	{
+		public const string GithubURL = "https://github.com/mkahvi/sysmon";
+
 		protected override CreateParams CreateParams
 		{
 			get
@@ -835,6 +837,16 @@ namespace SystemMonitor
 			runatstart.Checked = RunAtStart(true, true);
 
 			ContextMenu.MenuItems.Add("-");
+
+			ContextMenu.MenuItems.Add("About", (_, _ea) =>
+			{
+				MessageBox.Show("System Monitor\nCreated by M.A., 2017–2019\n\nAt Github: " + GithubURL + "\n\nFree system monitor app.\n\nAvailable under MIT license.", "About System Monitor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+			});
+
+			ContextMenu.MenuItems.Add("Github", (_, _ea) => { Process.Start(GithubURL); });
+   
+			ContextMenu.MenuItems.Add("-");
+
 			var adminRestart = ContextMenu.MenuItems.Add("Restart as admin");
 			if (!MKAh.Execution.IsAdministrator)
 			{
@@ -961,7 +973,7 @@ namespace SystemMonitor
 			Console.WriteLine(AppPath);
 
 			bool OHWPresent = System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(
-	System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName), "OpenHardwareMonitorLib.dll"));
+				System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName), "OpenHardwareMonitorLib.dll"));
 
 			Console.WriteLine("OHW present: " + OHWPresent.ToString());
 
