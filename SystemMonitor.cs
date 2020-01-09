@@ -96,8 +96,9 @@ namespace SystemMonitor
 
 		float bottleneck_mem = 0, bottleneck_cpu = 0, bottleneck_nvm = 0;
 
-		float LowMemThreshold = 4;
-		float LowMemMultiplier = 5.2f;
+		float LowMemThreshold => 4f;
+
+		float LowMemMultiplier => 1.3f;
 
 		string[] IgnoreProcesses = { "svchost", "wininit", "System", "Idle" };
 
@@ -219,26 +220,26 @@ namespace SystemMonitor
 			const float bytesToGBDivisor = 1024f * 1024f * 1024f;
 
 			//float memusedt = (memtotaltb - memfreetb) / bytesToGBDivisor; // used mem
-			float memfreet = memfreetb / bytesToGBDivisor; // free mem in GB
+			float memfreegbt = memfreetb / bytesToGBDivisor; // free mem in GB
 
 			// Actual as reported, and memory as determined programmatically. The difference is likely disk caching space.
 			// Memory pressure going over the "true" value is likely going to result in poor performance.
 			float privmem = privatememory.Value;
 
 			//float memfreet = memfree.Value / 1024; // free memory in GB
-			float mempressure = (privmem / TotalMemory);
+			float mempressure = (privmem / TotalMemory); // 0 to 1
 			//float memfreert = (TotalMemory - privmem) / 1024000000;
 
-			Sensor_Memory.Value.Text = $"{memfreet:N2} GiB free\n{memcommit.Value:N1}% commit\n{mempressure * 100f:N1}% pressure";
+			Sensor_Memory.Value.Text = $"{memfreegbt:N2} GiB free\n{memcommit.Value:N1}% commit\n{mempressure * 100f:N1}% pressure";
 
-			var tempmem = (TotalMemoryMB) - (memfreet * 1000);
+			var tempmem = (TotalMemoryMB) - (memfreegbt * 1000);
 
 			Sensor_Memory.Chart.Add(tempmem);
 
 			// BOTTLENECK :: MEM
 			bottleneck_mem =
 				(mempressure * 10f) // 1 to 0 memory pressure into 10 to 0 scale.
-				+ ((LowMemThreshold - memfreet) * LowMemMultiplier).Min(0f); // low memory
+				+ ((LowMemThreshold - memfreegbt).Min(0f) * LowMemMultiplier); // low memory
 
 			var splitiot = splitio.Value;
 			var highavgt = Math.Max(avgnvmread.Value * 1000, avgnvmwrite.Value * 1000);
@@ -317,7 +318,7 @@ namespace SystemMonitor
 			{
 				if (cpuusaget >= 85.0 || cpuqueuet >= 5.0) Sensor_CPU.Warn();
 
-				if ((memfreet <= Settings.Current.FreeMemoryThreshold) || (mempressure >= (Settings.Current.MemoryPressureThreshold))) Sensor_Memory.Warn();
+				if ((memfreegbt <= Settings.Current.FreeMemoryThreshold) || (mempressure >= (Settings.Current.MemoryPressureThreshold))) Sensor_Memory.Warn();
 
 				if (splitiot >= 2 || highavgt >= 45 || nvmtimet >= 20) Sensor_NVMIO.Warn();
 
